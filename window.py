@@ -1,11 +1,19 @@
-from PyQt4 import QtCore, QtGui
+import os
+
+from PyQt4 import QtCore, QtGui, QtNetwork
 
 
 class MainWindow(QtGui.QDialog):
 
     def __init__(self, parent=None):
         super(MainWindow, self).__init__(parent)
+
+        self.nam = QtNetwork.QNetworkAccessManager(self)
+        self.timer = QtCore.QTimer()
+        self.timer.setInterval(6000)
+
         self.create_layout()
+        self.create_connections()
 
     def create_layout(self):
         trade_label = QtGui.QLabel("Trade code:")
@@ -20,6 +28,7 @@ class MainWindow(QtGui.QDialog):
 
         self.fetch_button = QtGui.QPushButton("Start fetching")
         self.stop_button = QtGui.QPushButton("Stop fetching")
+        self.stop_button.setEnabled(False)
 
         self.canvas = QtGui.QGraphicsView()
         self.status = QtGui.QLabel("Ready")
@@ -52,4 +61,50 @@ class MainWindow(QtGui.QDialog):
         grid.addLayout(hbox_buttons, 0, 3)
         grid.addWidget(self.canvas, 1, 0, 1, 4)
         grid.addWidget(self.status, 2, 0, 1, 4)
+
+    def create_connections(self):
+        self.connect(self.fetch_button, QtCore.SIGNAL("clicked()"),
+                     self.start_fetching)
+        self.connect(self.stop_button, QtCore.SIGNAL("clicked()"),
+                     self.stop_fetching)
+        self.connect(self.timer, QtCore.SIGNAL("timeout()"), self.make_request)
+
+    def start_fetching(self):
+        self.fetch_button.setEnabled(False)
+        self.stop_button.setEnabled(True)
+
+        self.timer.start()
+        self.make_request()
+
+    def stop_fetching(self):
+        self.fetch_button.setEnabled(True)
+        self.stop_button.setEnabled(False)
+
+        self.timer.stop()
+        self.status.setText("Ready")
+
+    def make_request(self):
+        self.status.setText("Requesting new data...")
+
+        url = QtCore.QUrl("http://dsecse.latest.nsmgr8.appspot.com/dse")
+        self.reply = self.nam.get(QtNetwork.QNetworkRequest(url))
+        self.connect(self.reply, QtCore.SIGNAL("readyRead()"), self.finished)
+
+    def finished(self):
+        status = self.reply.attribute(QtNetwork.QNetworkRequest
+                                      .HttpStatusCodeAttribute)
+        if(status.toInt() == (200, True)):
+            fname = str(self.reply.rawHeader("Content-Disposition"))
+            csv_folder = "csv"
+            fname = os.path.join(csv_folder, fname[fname.find("dse"):-1]) \
+                    .replace(':', '-')
+            if not os.path.isdir(csv_folder):
+                os.mkdir(csv_folder)
+            with open(fname, 'w') as f:
+                f.write(self.reply.readAll())
+            msg = "Saved csv at %s" % fname
+        else:
+            msg = "Error downloading data"
+
+        self.status.setText(msg)
 
