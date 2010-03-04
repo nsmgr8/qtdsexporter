@@ -1,12 +1,18 @@
 import os
+import datetime
 
 from PyQt4 import QtCore, QtGui, QtNetwork
+
+from models_elixir import *
 
 
 class MainWindow(QtGui.QDialog):
 
     def __init__(self, parent=None):
         super(MainWindow, self).__init__(parent)
+
+        setup_all()
+        create_all()
 
         self.nam = QtNetwork.QNetworkAccessManager(self)
         self.timer = QtCore.QTimer()
@@ -96,13 +102,41 @@ class MainWindow(QtGui.QDialog):
         if(status.toInt() == (200, True)):
             fname = str(self.reply.rawHeader("Content-Disposition"))
             csv_folder = "csv"
-            fname = os.path.join(csv_folder, fname[fname.find("dse"):-1]) \
-                    .replace(':', '-')
             if not os.path.isdir(csv_folder):
                 os.mkdir(csv_folder)
+            fname = os.path.join(csv_folder, fname[fname.find("dse"):-1]) \
+                    .replace(':', '-')
+
+            trade_at = datetime.datetime.strptime(fname[8:-4],
+                                                  "%Y-%m-%dT%H-%M-%S")
+
+            data = self.reply.readAll()
             with open(fname, 'w') as f:
-                f.write(self.reply.readAll())
+                f.write(data)
             msg = "Saved csv at %s" % fname
+
+            data = str(data).split('\r\n')[1:]
+            for d in data:
+                d = d.split(',')
+                if len(d) < 11:
+                    continue
+                d = map(unicode, d)
+                code = Code.query.filter_by(code=d[0]).all()
+                if code:
+                    code = code[0]
+                else:
+                    code = Code(code=d[0])
+
+                trade = Trade.query.filter_by(code=code,
+                                              trade_at=trade_at).all()
+                if not trade:
+                    Trade(code=code, trade_at=trade_at,
+                          open=float(d[3]), close=float(d[6]),
+                          high=float(d[4]), low=float(d[5]),
+                          last=float(d[7]), change=float(d[8]),
+                          trade=int(d[9]), volume=int(d[10]))
+
+                session.commit()
         else:
             msg = "Error downloading data"
 
