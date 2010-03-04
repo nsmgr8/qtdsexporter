@@ -20,6 +20,7 @@ class MainWindow(QtGui.QDialog):
 
         self.create_layout()
         self.create_connections()
+        self.populate_widgets()
 
     def create_layout(self):
         trade_label = QtGui.QLabel("Trade code:")
@@ -75,6 +76,11 @@ class MainWindow(QtGui.QDialog):
                      self.stop_fetching)
         self.connect(self.timer, QtCore.SIGNAL("timeout()"), self.make_request)
 
+    def populate_widgets(self):
+        codes = Code.query.all()
+        self.trade_combo.addItems([code.code for code in codes])
+        self.ind_combo.addItems(['Open', 'Close', 'Trade', 'Volume'])
+
     def start_fetching(self):
         self.fetch_button.setEnabled(False)
         self.stop_button.setEnabled(True)
@@ -101,45 +107,50 @@ class MainWindow(QtGui.QDialog):
                                       .HttpStatusCodeAttribute)
         if(status.toInt() == (200, True)):
             fname = str(self.reply.rawHeader("Content-Disposition"))
-            csv_folder = "csv"
+            csv_folder = os.path.join(
+                os.path.dirname(os.path.realpath(__file__)), "csv")
             if not os.path.isdir(csv_folder):
                 os.mkdir(csv_folder)
             fname = os.path.join(csv_folder, fname[fname.find("dse"):-1]) \
                     .replace(':', '-')
 
-            trade_at = datetime.datetime.strptime(fname[8:-4],
+            trade_at = datetime.datetime.strptime(fname[-23:-4],
                                                   "%Y-%m-%dT%H-%M-%S")
 
             data = self.reply.readAll()
             with open(fname, 'w') as f:
                 f.write(data)
-            msg = "Saved csv at %s" % fname
 
-            data = str(data).split('\r\n')[1:]
-            for d in data:
-                d = d.split(',')
-                if len(d) < 11:
-                    continue
-                d = map(unicode, d)
+            self.save_data(trade_at, data)
 
-                try:
-                    code = Code.query.filter_by(code=d[0]).one()
-                except:
-                    code = Code(code=d[0])
-
-                try:
-                    trade = Trade.query.filter_by(code=code,
-                                                  trade_at=trade_at).one()
-                except:
-                    Trade(code=code, trade_at=trade_at,
-                          open=float(d[3]), close=float(d[6]),
-                          high=float(d[4]), low=float(d[5]),
-                          last=float(d[7]), change=float(d[8]),
-                          trade=int(d[9]), volume=int(d[10]))
-
-                session.commit()
+            msg = "Saved data at %s" % trade_at.isoformat()
         else:
             msg = "Error downloading data: %s" % status.toInt()
 
         self.status.setText(msg)
+
+    def save_data(self, trade_at, data):
+        data = str(data).split('\r\n')[1:]
+        for d in data:
+            d = d.split(',')
+            if len(d) < 11:
+                continue
+            d = map(unicode, d)
+
+            try:
+                code = Code.query.filter_by(code=d[0]).one()
+            except:
+                code = Code(code=d[0])
+
+            try:
+                trade = Trade.query.filter_by(code=code,
+                                              trade_at=trade_at).one()
+            except:
+                Trade(code=code, trade_at=trade_at,
+                      open=float(d[3]), close=float(d[6]),
+                      high=float(d[4]), low=float(d[5]),
+                      last=float(d[7]), change=float(d[8]),
+                      trade=int(d[9]), volume=int(d[10]))
+
+            session.commit()
 
