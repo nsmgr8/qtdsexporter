@@ -3,7 +3,7 @@ import datetime
 
 from PyQt4 import QtCore, QtGui, QtNetwork
 
-from models_elixir import *
+from models import *
 
 
 class MainWindow(QtGui.QDialog):
