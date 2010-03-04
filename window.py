@@ -121,15 +121,16 @@ class MainWindow(QtGui.QDialog):
                 if len(d) < 11:
                     continue
                 d = map(unicode, d)
-                code = Code.query.filter_by(code=d[0]).all()
-                if code:
-                    code = code[0]
-                else:
+
+                try:
+                    code = Code.query.filter_by(code=d[0]).one()
+                except:
                     code = Code(code=d[0])
 
-                trade = Trade.query.filter_by(code=code,
-                                              trade_at=trade_at).all()
-                if not trade:
+                try:
+                    trade = Trade.query.filter_by(code=code,
+                                                  trade_at=trade_at).one()
+                except:
                     Trade(code=code, trade_at=trade_at,
                           open=float(d[3]), close=float(d[6]),
                           high=float(d[4]), low=float(d[5]),
@@ -138,7 +139,7 @@ class MainWindow(QtGui.QDialog):
 
                 session.commit()
         else:
-            msg = "Error downloading data"
+            msg = "Error downloading data: %s" % status.toInt()
 
         self.status.setText(msg)
 
