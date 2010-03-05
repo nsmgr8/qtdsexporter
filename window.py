@@ -141,7 +141,7 @@ class MainWindow(QtGui.QDialog):
 
             msg = "Saved data at %s" % trade_at.isoformat()
         else:
-            msg = "Error downloading data: %s" % status.toInt()
+            msg = "Error downloading data: %s" % str(status.toInt())
 
         self.status.setText(msg)
 
@@ -168,13 +168,14 @@ class MainWindow(QtGui.QDialog):
                       last=float(d[7]), change=float(d[8]),
                       trade=int(d[9]), volume=int(d[10]))
 
-            session.commit()
+        session.commit()
 
     def load_data(self):
         dirname = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                                'csv')
         for dir, dirs, fnames in os.walk(dirname):
             for f in fnames:
+                QtGui.QApplication.processEvents()
                 if f.endswith(".csv"):
                     fname = os.path.join(dir, f)
                     trade_at = datetime.datetime.strptime(fname[-23:-4],
@@ -213,14 +214,15 @@ class MainWindow(QtGui.QDialog):
         index = []
         for trade in trades:
             times.append(trade.trade_at.minute + trade.trade_at.hour * 60 -
-                         day_start)
+                         day_start + 20)
             index.append(indexes[indicator](trade))
 
         max_index = max(index)
         min_index = min(index)
         if max_index == min_index:
             min_index = 0
-        points = zip(times, map(lambda x: 280-270*(x-min_index)/max_index,
+        points = zip(times, map(lambda x:
+                                280-270*(x-min_index)/(max_index-min_index),
                                 index))
 
         path = QtGui.QPainterPath()
@@ -247,7 +249,7 @@ class MainWindow(QtGui.QDialog):
         dx = (maxx - minx) / 9.0
         for i in range(280, 0, -30):
             self.scene.addLine(20, i, 30, i)
-            text = QtGui.QGraphicsTextItem("%.0f" % (dx*(280-i)/30))
+            text = QtGui.QGraphicsTextItem("%.0f" % (dx*(280-i)/30+minx))
             text.setPos(30, i-10)
             self.scene.addItem(text)
 
