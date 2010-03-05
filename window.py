@@ -238,7 +238,9 @@ class MainWindow(QtGui.QDialog):
             pathitem = self.scene.addPath(path)
             pathitem.setPen(QtGui.QPen(QtGui.QColor("red")))
         except:
-            self.scene.addText("No data available")
+            self.scene.addText("No data available for %s:%s at %s" % (code.code,
+                                                                     indicator,
+                                                                     date.isoformat()))
 
     def draw_time_axis(self):
         self.scene.addLine(QtCore.QLineF(-50, 290, 700, 290))
