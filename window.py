@@ -93,7 +93,7 @@ class MainWindow(QtGui.QDialog):
         self.connect(self.timer, QtCore.SIGNAL("timeout()"), self.make_request)
 
     def populate_widgets(self):
-        codes = Code.query.all()
+        codes = Code.query.order_by(Code.code).all()
         self.trade_combo.addItems([code.code for code in codes])
         self.ind_combo.addItems(['Open', 'Close', 'Trade', 'Volume'])
 
@@ -140,6 +140,7 @@ class MainWindow(QtGui.QDialog):
             self.save_data(trade_at, data)
 
             msg = "Saved data at %s" % trade_at.isoformat()
+            self.plot_graph()
         else:
             msg = "Error downloading data: %s" % str(status.toInt())
 
@@ -217,23 +218,27 @@ class MainWindow(QtGui.QDialog):
                          day_start + 20)
             index.append(indexes[indicator](trade))
 
-        max_index = max(index)
-        min_index = min(index)
-        if max_index == min_index:
-            min_index = 0
-        points = zip(times, map(lambda x:
-                                280-270*(x-min_index)/(max_index-min_index),
-                                index))
-
-        path = QtGui.QPainterPath()
-        path.moveTo(points[0][0], points[0][1])
-        for p in points:
-            path.lineTo(p[0], p[1])
-
         self.scene.clear()
-        self.draw_time_axis()
-        self.draw_value_axis(min_index, max_index)
-        self.scene.addPath(path)
+        try:
+            max_index = max(index)
+            min_index = min(index)
+            if max_index == min_index:
+                min_index = 0
+            points = zip(times, map(lambda x:
+                                    280-270*(x-min_index)/(max_index-min_index),
+                                    index))
+
+            path = QtGui.QPainterPath()
+            path.moveTo(points[0][0], points[0][1])
+            for p in points:
+                path.lineTo(p[0], p[1])
+
+            self.draw_time_axis()
+            self.draw_value_axis(min_index, max_index)
+            pathitem = self.scene.addPath(path)
+            pathitem.setPen(QtGui.QPen(QtGui.QColor("red")))
+        except:
+            self.scene.addText("No data available")
 
     def draw_time_axis(self):
         self.scene.addLine(QtCore.QLineF(-50, 290, 700, 290))
