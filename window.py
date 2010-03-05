@@ -37,6 +37,8 @@ class MainWindow(QtGui.QWidget):
         self.ind_combo = QtGui.QComboBox()
         ind_label.setBuddy(self.ind_combo)
 
+        self.live_check = QtGui.QCheckBox("Live graph")
+
         self.graph_button = QtGui.QPushButton("Graph data")
         self.fetch_button = QtGui.QPushButton("Start fetching")
         self.stop_button = QtGui.QPushButton("Stop fetching")
@@ -66,6 +68,7 @@ class MainWindow(QtGui.QWidget):
 
         hbox_graph = QtGui.QHBoxLayout()
         hbox_graph.addWidget(self.graph_button)
+        hbox_graph.addWidget(self.live_check)
         hbox_graph.addStretch()
 
         vbox2 = QtGui.QVBoxLayout()
@@ -90,6 +93,8 @@ class MainWindow(QtGui.QWidget):
                      self.start_fetching)
         self.connect(self.stop_button, QtCore.SIGNAL("clicked()"),
                      self.stop_fetching)
+        self.connect(self.live_check, QtCore.SIGNAL("stateChanged(int)"),
+                     self.live_plot)
         self.connect(self.timer, QtCore.SIGNAL("timeout()"), self.make_request)
 
     def populate_widgets(self):
@@ -140,7 +145,9 @@ class MainWindow(QtGui.QWidget):
             self.save_data(trade_at, data)
 
             msg = "Saved data at %s" % trade_at.isoformat()
-            self.plot_graph()
+
+            if self.live_check.checkState() == QtCore.Qt.Checked:
+                self.plot_graph()
         else:
             msg = "Error downloading data: %s" % str(status.toInt())
 
@@ -263,4 +270,12 @@ class MainWindow(QtGui.QWidget):
             text.setPos(710, i-10)
             self.scene.addItem(text)
 
+    def live_plot(self):
+        check = self.live_check.checkState()
+        if check == QtCore.Qt.Checked:
+            self.date_picker.setDate(QtCore.QDate.currentDate())
+            self.date_picker.setEnabled(False)
+            self.plot_graph()
+        elif check == QtCore.Qt.Unchecked:
+            self.date_picker.setEnabled(True)
 
