@@ -8,6 +8,25 @@ from models import *
 
 class MainWindow(QtGui.QWidget):
 
+    DAY_START = 7
+    DAY_END = 18
+    HOURS = DAY_END - DAY_START
+    TIME_PIXELS = 60 * HOURS
+    PLOT_PIXELS = 270  # divisible by 9
+
+    TIME_TICK = TIME_PIXELS / HOURS
+    PLOT_TICK = PLOT_PIXELS / 9
+
+    PLOT_PADDING = 20
+
+    PLOT_LEFT = 10
+    PLOT_RIGHT = TIME_PIXELS + PLOT_LEFT + 2 * PLOT_PADDING
+    PLOT_TOP = 10
+    PLOT_BOTTOM = PLOT_PIXELS + PLOT_TOP + 2 * PLOT_PADDING
+
+    SCENE_WIDTH = PLOT_RIGHT + 50
+    SCENE_HEIGHT = PLOT_BOTTOM + 30
+
     def __init__(self, parent=None):
         super(MainWindow, self).__init__(parent)
 
@@ -16,7 +35,7 @@ class MainWindow(QtGui.QWidget):
 
         self.nam = QtNetwork.QNetworkAccessManager(self)
         self.timer = QtCore.QTimer()
-        self.timer.setInterval(6000)
+        self.timer.setInterval(50000)
 
         self.create_layout()
         self.create_connections()
@@ -44,7 +63,8 @@ class MainWindow(QtGui.QWidget):
         self.stop_button = QtGui.QPushButton("Stop fetching")
         self.stop_button.setEnabled(False)
 
-        self.scene = QtGui.QGraphicsScene(0, 0, 760, 320);
+        self.scene = QtGui.QGraphicsScene(0, 0, self.SCENE_WIDTH, self.SCENE_HEIGHT);
+        self.scene.setBackgroundBrush(QtGui.QColor(0xFF, 0xFF, 0xEE))
         canvas = QtGui.QGraphicsView(self.scene)
 
         self.status = QtGui.QLabel("Ready")
@@ -215,14 +235,12 @@ class MainWindow(QtGui.QWidget):
             'Volume': lambda x: x.volume,
         }
 
-        day_start = 7 * 60
-        day_end = 18 * 60
-
         times = []
         index = []
         for trade in trades:
-            times.append(trade.trade_at.minute + trade.trade_at.hour * 60 -
-                         day_start + 20)
+            times.append(trade.trade_at.minute + (trade.trade_at.hour -
+                         self.DAY_START) * 60 + self.PLOT_PADDING +
+                         self.PLOT_LEFT)
             index.append(indexes[indicator](trade))
 
         self.scene.clear()
@@ -231,8 +249,9 @@ class MainWindow(QtGui.QWidget):
             min_index = min(index)
             if max_index == min_index:
                 min_index = 0
-            points = zip(times, map(lambda x:
-                                    280-270*(x-min_index)/(max_index-min_index),
+            points = zip(times, map(lambda x: self.PLOT_BOTTOM -
+                                    self.PLOT_PADDING - self.PLOT_PIXELS *
+                                    (x - min_index) / (max_index - min_index),
                                     index))
 
             path = QtGui.QPainterPath()
@@ -250,24 +269,33 @@ class MainWindow(QtGui.QWidget):
                                                                      date.isoformat()))
 
     def draw_time_axis(self):
-        self.scene.addLine(QtCore.QLineF(0, 290, 700, 290))
-        self.scene.addLine(QtCore.QLineF(0, -10, 700, -10))
-        for i in range(20, 681, 60):
-            tick = self.scene.addLine(i, -10, i, 290)
+        self.scene.addLine(QtCore.QLineF(self.PLOT_LEFT, self.PLOT_TOP,
+                                         self.PLOT_RIGHT, self.PLOT_TOP))
+        self.scene.addLine(QtCore.QLineF(self.PLOT_LEFT, self.PLOT_BOTTOM,
+                                         self.PLOT_RIGHT, self.PLOT_BOTTOM))
+
+        for i in range(self.PLOT_LEFT+self.PLOT_PADDING, self.PLOT_RIGHT,
+                       self.TIME_TICK):
+            tick = self.scene.addLine(i, self.PLOT_TOP, i, self.PLOT_BOTTOM)
             tick.setPen(QtGui.QPen(QtGui.QColor(0x35, 0xFF, 0xAA, 100)))
-            text = QtGui.QGraphicsTextItem("%02d:00" % (i/60 + 7))
-            text.setPos(i-20, 295)
+            text = QtGui.QGraphicsTextItem("%02d:00" % (i / 60 + self.DAY_START))
+            text.setPos(i - 20, self.PLOT_BOTTOM)
             self.scene.addItem(text)
 
     def draw_value_axis(self, minx, maxx):
-        self.scene.addLine(QtCore.QLineF(700, -10, 700, 290))
-        self.scene.addLine(QtCore.QLineF(0, -10, 0, 290))
+        self.scene.addLine(QtCore.QLineF(self.PLOT_LEFT, self.PLOT_TOP,
+                                         self.PLOT_LEFT, self.PLOT_BOTTOM))
+        self.scene.addLine(QtCore.QLineF(self.PLOT_RIGHT, self.PLOT_TOP,
+                                         self.PLOT_RIGHT, self.PLOT_BOTTOM))
+
         dx = (maxx - minx) / 9.0
-        for i in range(280, 0, -30):
-            tick = self.scene.addLine(0, i, 700, i)
+        for i in range(self.PLOT_TOP+self.PLOT_PADDING, self.PLOT_BOTTOM,
+                       self.PLOT_TICK):
+            tick = self.scene.addLine(self.PLOT_LEFT, i, self.PLOT_RIGHT, i)
             tick.setPen(QtGui.QPen(QtGui.QColor(0xAA, 0xAA, 0xAA, 100)))
-            text = QtGui.QGraphicsTextItem("%.0f" % (dx*(280-i)/30+minx))
-            text.setPos(710, i-10)
+            text = QtGui.QGraphicsTextItem("%.0f" % (dx * (self.PLOT_PIXELS -
+                                                    i) / self.PLOT_TICK + minx))
+            text.setPos(self.PLOT_RIGHT, i-10)
             self.scene.addItem(text)
 
     def live_plot(self):
