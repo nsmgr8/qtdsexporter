@@ -6,7 +6,7 @@ from PyQt4 import QtCore, QtGui, QtNetwork
 from models import *
 
 
-class MainWindow(QtGui.QDialog):
+class MainWindow(QtGui.QWidget):
 
     def __init__(self, parent=None):
         super(MainWindow, self).__init__(parent)
@@ -42,7 +42,7 @@ class MainWindow(QtGui.QDialog):
         self.stop_button = QtGui.QPushButton("Stop fetching")
         self.stop_button.setEnabled(False)
 
-        self.scene = QtGui.QGraphicsScene(0, 0, 700, 320);
+        self.scene = QtGui.QGraphicsScene(0, 0, 760, 320);
         canvas = QtGui.QGraphicsView(self.scene)
 
         self.status = QtGui.QLabel("Ready")
@@ -243,21 +243,24 @@ class MainWindow(QtGui.QDialog):
                                                                      date.isoformat()))
 
     def draw_time_axis(self):
-        self.scene.addLine(QtCore.QLineF(-50, 290, 700, 290))
+        self.scene.addLine(QtCore.QLineF(0, 290, 700, 290))
+        self.scene.addLine(QtCore.QLineF(0, -10, 700, -10))
         for i in range(20, 681, 60):
-            self.scene.addLine(i, 280, i, 290)
+            tick = self.scene.addLine(i, -10, i, 290)
+            tick.setPen(QtGui.QPen(QtGui.QColor(0x35, 0xFF, 0xAA, 100)))
             text = QtGui.QGraphicsTextItem("%02d:00" % (i/60 + 7))
             text.setPos(i-20, 295)
             self.scene.addItem(text)
 
     def draw_value_axis(self, minx, maxx):
-        self.scene.addLine(QtCore.QLineF(20, -10, 20, 330))
-
+        self.scene.addLine(QtCore.QLineF(700, -10, 700, 290))
+        self.scene.addLine(QtCore.QLineF(0, -10, 0, 290))
         dx = (maxx - minx) / 9.0
         for i in range(280, 0, -30):
-            self.scene.addLine(20, i, 30, i)
+            tick = self.scene.addLine(0, i, 700, i)
+            tick.setPen(QtGui.QPen(QtGui.QColor(0xAA, 0xAA, 0xAA, 100)))
             text = QtGui.QGraphicsTextItem("%.0f" % (dx*(280-i)/30+minx))
-            text.setPos(30, i-10)
+            text.setPos(710, i-10)
             self.scene.addItem(text)
 
 
