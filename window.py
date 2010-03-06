@@ -179,14 +179,14 @@ class MainWindow(QtGui.QWidget):
                 os.path.dirname(os.path.realpath(__file__)), "csv")
             if not os.path.isdir(csv_folder):
                 os.mkdir(csv_folder)
-            fname = os.path.join(csv_folder, fname[fname.find("dse"):-1]) \
-                    .replace(':', '-')
+            fname = os.path.join(csv_folder, fname[fname.find("dse"):-1] \
+                    .replace(':', '-'))
 
             trade_at = datetime.datetime.strptime(fname[-23:-4],
                                                   "%Y-%m-%dT%H-%M-%S")
 
             data = self.reply.readAll()
-            with open(fname, 'w') as f:
+            with open(fname, 'wb') as f:
                 f.write(data)
 
             self.save_data(trade_at, data)
