@@ -23,7 +23,7 @@ installed. Following is a quick installation for Ubuntu/Debian Linux:
 
 Requirements::
 
-    sudo apt-get install python-qt4 python-elixir python-sqlite2
+    sudo apt-get install python-qt4 python-elixir
 
 Now, download the `source code`_, unzip it in a folder and run.
 
