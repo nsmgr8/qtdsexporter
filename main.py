@@ -7,7 +7,7 @@ from PyQt4 import QtGui
 from window import MainWindow
 
 if __name__ == '__main__':
-    app = QtGui.QApplication([''])
+    app = QtGui.QApplication(sys.argv)
 
     window = MainWindow()
     window.show()
