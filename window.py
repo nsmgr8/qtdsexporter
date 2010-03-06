@@ -4,6 +4,7 @@ import datetime
 from PyQt4 import QtCore, QtGui, QtNetwork
 
 from models import *
+from scene import PlotScene
 
 
 class MainWindow(QtGui.QWidget):
@@ -57,33 +58,38 @@ class MainWindow(QtGui.QWidget):
         ind_label.setBuddy(self.ind_combo)
 
         self.live_check = QtGui.QCheckBox("Live graph")
-
         self.graph_button = QtGui.QPushButton("Graph data")
         self.fetch_button = QtGui.QPushButton("Start fetching")
         self.stop_button = QtGui.QPushButton("Stop fetching")
         self.stop_button.setEnabled(False)
 
-        self.scene = QtGui.QGraphicsScene(0, 0, self.SCENE_WIDTH, self.SCENE_HEIGHT);
+        self.scene = PlotScene(0, 0, self.SCENE_WIDTH, self.SCENE_HEIGHT);
         self.scene.setBackgroundBrush(QtGui.QColor(0xFF, 0xFF, 0xEE))
-        canvas = QtGui.QGraphicsView(self.scene)
+        self.scene.setPlotProps(self.PLOT_PADDING, self.PLOT_LEFT, self.PLOT_TOP,
+                                self.PLOT_RIGHT, self.PLOT_BOTTOM)
+        self.canvas = QtGui.QGraphicsView(self.scene)
+        self.canvas.setCursor(QtCore.Qt.CrossCursor)
 
         self.status = QtGui.QLabel("Ready")
+        self.coords = QtGui.QLabel()
+        self.coords.setAlignment(QtCore.Qt.AlignRight)
+        self.scene.setStatusLabel(self.coords)
 
         hbox_trade = QtGui.QHBoxLayout()
         hbox_trade.addWidget(trade_label)
         hbox_trade.addWidget(self.trade_combo)
 
         hbox_date = QtGui.QHBoxLayout()
-        hbox_date.addWidget(date_label)
-        hbox_date.addWidget(self.date_picker)
+        hbox_date.addWidget(ind_label)
+        hbox_date.addWidget(self.ind_combo)
 
         vbox1 = QtGui.QVBoxLayout()
         vbox1.addLayout(hbox_trade)
         vbox1.addLayout(hbox_date)
 
         hbox_ind = QtGui.QHBoxLayout()
-        hbox_ind.addWidget(ind_label)
-        hbox_ind.addWidget(self.ind_combo)
+        hbox_ind.addWidget(date_label)
+        hbox_ind.addWidget(self.date_picker)
         hbox_ind.addStretch()
 
         hbox_graph = QtGui.QHBoxLayout()
@@ -103,8 +109,9 @@ class MainWindow(QtGui.QWidget):
         grid.addLayout(vbox1, 0, 0)
         grid.addLayout(vbox2, 0, 1)
         grid.addLayout(vbox_buttons, 0, 3)
-        grid.addWidget(canvas, 1, 0, 1, 4)
-        grid.addWidget(self.status, 2, 0, 1, 4)
+        grid.addWidget(self.canvas, 1, 0, 1, 4)
+        grid.addWidget(self.status, 2, 0, 1, 3)
+        grid.addWidget(self.coords, 2, 3)
 
     def create_connections(self):
         self.connect(self.graph_button, QtCore.SIGNAL("clicked()"),
@@ -223,9 +230,12 @@ class MainWindow(QtGui.QWidget):
 
         trades = Trade.get_by_code(code, date).order_by(Trade.trade_at).all()
 
+        NO_DATA_MSG = "No data available for %s:%s at %s" % (code.code,
+                                                             indicator,
+                                                             date.isoformat())
         if len(trades) == 0:
             self.scene.clear()
-            self.scene.addText("No data available")
+            self.scene.addText(NO_DATA_MSG)
             return
 
         indexes = {
@@ -249,6 +259,9 @@ class MainWindow(QtGui.QWidget):
             min_index = min(index)
             if max_index == min_index:
                 min_index = 0
+
+            self.scene.setScales(self.DAY_START, min_index, max_index)
+
             points = zip(times, map(lambda x: self.PLOT_BOTTOM -
                                     self.PLOT_PADDING - self.PLOT_PIXELS *
                                     (x - min_index) / (max_index - min_index),
@@ -263,10 +276,10 @@ class MainWindow(QtGui.QWidget):
             self.draw_value_axis(min_index, max_index)
             pathitem = self.scene.addPath(path)
             pathitem.setPen(QtGui.QPen(QtGui.QColor("red")))
+            self.scene.plotted = True
         except:
-            self.scene.addText("No data available for %s:%s at %s" % (code.code,
-                                                                     indicator,
-                                                                     date.isoformat()))
+            self.scene.plotted = False
+            self.scene.addText(NO_DATA_MSG)
 
     def draw_time_axis(self):
         self.scene.addLine(QtCore.QLineF(self.PLOT_LEFT, self.PLOT_TOP,
@@ -288,13 +301,15 @@ class MainWindow(QtGui.QWidget):
         self.scene.addLine(QtCore.QLineF(self.PLOT_RIGHT, self.PLOT_TOP,
                                          self.PLOT_RIGHT, self.PLOT_BOTTOM))
 
-        dx = (maxx - minx) / 9.0
+        dx = (maxx - minx)
         for i in range(self.PLOT_TOP+self.PLOT_PADDING, self.PLOT_BOTTOM,
                        self.PLOT_TICK):
             tick = self.scene.addLine(self.PLOT_LEFT, i, self.PLOT_RIGHT, i)
             tick.setPen(QtGui.QPen(QtGui.QColor(0xAA, 0xAA, 0xAA, 100)))
-            text = QtGui.QGraphicsTextItem("%.0f" % (dx * (self.PLOT_PIXELS -
-                                                    i) / self.PLOT_TICK + minx))
+
+            y = (maxx + minx) - (dx * (i - (self.PLOT_TOP + self.PLOT_PADDING))
+                                 / self.PLOT_PIXELS + minx)
+            text = QtGui.QGraphicsTextItem("%.0f" % y)
             text.setPos(self.PLOT_RIGHT, i-10)
             self.scene.addItem(text)
 
