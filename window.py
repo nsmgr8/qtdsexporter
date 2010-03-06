@@ -179,6 +179,9 @@ class MainWindow(QtGui.QWidget):
             msg = "Error downloading data: %s" % str(status.toInt())
 
         self.status.setText(msg)
+        self.trade_combo.clear()
+        self.ind_combo.clear()
+        self.populate_widgets()
 
     def save_data(self, trade_at, data):
         data = str(data).split('\r\n')[1:]
