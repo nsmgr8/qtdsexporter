@@ -42,7 +42,7 @@ class MainWindow(QtGui.QWidget):
 
     PLOT_LEFT = 120
     PLOT_RIGHT = TIME_PIXELS + PLOT_LEFT + 2 * PLOT_PADDING
-    PLOT_TOP = 30
+    PLOT_TOP = 10
     PLOT_BOTTOM = PLOT_PIXELS + PLOT_TOP + 2 * PLOT_PADDING
 
     SCENE_WIDTH = PLOT_RIGHT + 50
@@ -302,6 +302,9 @@ class MainWindow(QtGui.QWidget):
                 ("Low: %.2f", low),
                 ("Close: %.2f", close.close),
                 ("Last: %.2f", last.close),
+                ("Change: %+.2f", close.close - last.close),
+                ("Change: %+.2f%%", (close.close - last.close) / last.close *
+                 100),
                 ("Trade: %d", num_trades),
                 ("Volume: %d", volume),
             )
