@@ -40,7 +40,7 @@ class MainWindow(QtGui.QWidget):
 
     PLOT_PADDING = 20
 
-    PLOT_LEFT = 10
+    PLOT_LEFT = 120
     PLOT_RIGHT = TIME_PIXELS + PLOT_LEFT + 2 * PLOT_PADDING
     PLOT_TOP = 30
     PLOT_BOTTOM = PLOT_PIXELS + PLOT_TOP + 2 * PLOT_PADDING
@@ -280,13 +280,13 @@ class MainWindow(QtGui.QWidget):
             'Volume': lambda x: x.volume,
         }
 
-        times = []
-        index = []
+        times, index, opens = [], [], []
         for trade in trades:
             times.append(trade.trade_at.minute + (trade.trade_at.hour -
                          self.DAY_START) * 60 + self.PLOT_PADDING +
                          self.PLOT_LEFT)
             index.append(indexes[indicator](trade))
+            opens.append(trade.open)
 
         close = Close.query.filter_by(code=code, day=date.date()).one()
         last = Close.query.filter_by(code=code, day=day_before).one()
@@ -295,14 +295,22 @@ class MainWindow(QtGui.QWidget):
 
         self.scene.clear()
         try:
-            high = max(index)
-            low = min(index)
-            self.scene.addText("High: %.2f, Low: %.2f, "
-                               "Close: %.2f, Last: %.2f, "
-                               " Trades: %d, Volume: %d"
-                               % (high, low, close.close, last.close,
-                                  num_trades, volume))
+            high, low = max(opens), min(opens)
+            texts = (
+                ("Code: %s", code.code),
+                ("High: %.2f", high),
+                ("Low: %.2f", low),
+                ("Close: %.2f", close.close),
+                ("Last: %.2f", last.close),
+                ("Trade: %d", num_trades),
+                ("Volume: %d", volume),
+            )
 
+            for i in range(len(texts)):
+                text = self.scene.addText(texts[i][0] % texts[i][1])
+                text.setPos(0, i*20)
+
+            high, low = max(index), min(index)
             if high == low:
                 low = 0
 
@@ -323,7 +331,8 @@ class MainWindow(QtGui.QWidget):
             pathitem = self.scene.addPath(path)
             pathitem.setPen(QtGui.QPen(QtGui.QColor("red")))
             self.scene.plotted = True
-        except:
+        except Exception, e:
+            print(e)
             self.scene.plotted = False
             self.scene.addText(NO_DATA_MSG)
 
@@ -337,7 +346,8 @@ class MainWindow(QtGui.QWidget):
                        self.TIME_TICK):
             tick = self.scene.addLine(i, self.PLOT_TOP, i, self.PLOT_BOTTOM)
             tick.setPen(QtGui.QPen(QtGui.QColor(0x35, 0xFF, 0xAA, 100)))
-            text = QtGui.QGraphicsTextItem("%02d:00" % (i / 60 + self.DAY_START))
+            text = QtGui.QGraphicsTextItem("%02d:00" % ((i - self.PLOT_LEFT) /
+                                                        60 + self.DAY_START))
             text.setPos(i - 20, self.PLOT_BOTTOM)
             self.scene.addItem(text)
 
