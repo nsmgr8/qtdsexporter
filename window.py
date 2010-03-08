@@ -194,8 +194,9 @@ class MainWindow(QtGui.QWidget):
 
             msg = "Saved data at %s" % trade_at.isoformat()
 
-            if self.trade_combo.currentText() == "":
-                self.populate_widgets()
+            current_code = self.trade_combo.currentText()
+            self.populate_widgets()
+            self.trade_combo.setCurrentIndex(self.trade_combo.findText(current_code))
 
             if self.live_check.checkState() == QtCore.Qt.Checked:
                 self.plot_graph()
