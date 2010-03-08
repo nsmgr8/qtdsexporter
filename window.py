@@ -42,7 +42,7 @@ class MainWindow(QtGui.QWidget):
 
     PLOT_LEFT = 10
     PLOT_RIGHT = TIME_PIXELS + PLOT_LEFT + 2 * PLOT_PADDING
-    PLOT_TOP = 10
+    PLOT_TOP = 30
     PLOT_BOTTOM = PLOT_PIXELS + PLOT_TOP + 2 * PLOT_PADDING
 
     SCENE_WIDTH = PLOT_RIGHT + 50
@@ -227,9 +227,15 @@ class MainWindow(QtGui.QWidget):
             try:
                 close = Close.query.filter_by(code=code,
                                               day=trade_at.date()).one()
-                close.close = float(d[4])
+                close.close = float(d[6])
             except:
-                Close(code=code, day=trade_at.date(), close=float(d[4]))
+                Close(code=code, day=trade_at.date(), close=float(d[6]))
+
+            try:
+                yesterday = trade_at.date() - datetime.timedelta(days=1)
+                Close.query.filter_by(code=code, day=yesterday).one()
+            except Exception, e:
+                Close(code=code, day=yesterday, close=float(d[7]))
 
         session.commit()
 
@@ -255,6 +261,7 @@ class MainWindow(QtGui.QWidget):
         date = self.date_picker.date()
         date = datetime.datetime(day=date.day(), month=date.month(),
                                  year=date.year())
+        yesterday = date.date() - datetime.timedelta(days=1)
 
         trades = Trade.get_by_code(code, date).order_by(Trade.trade_at).all()
 
@@ -280,18 +287,29 @@ class MainWindow(QtGui.QWidget):
                          self.PLOT_LEFT)
             index.append(indexes[indicator](trade))
 
+        close = Close.query.filter_by(code=code, day=date.date()).one()
+        last = Close.query.filter_by(code=code, day=yesterday).one()
+        num_trades = trades[-1].trade
+        volume = trades[-1].volume
+
         self.scene.clear()
         try:
-            max_index = max(index)
-            min_index = min(index)
-            if max_index == min_index:
-                min_index = 0
+            high = max(index)
+            low = min(index)
+            self.scene.addText("High: %.2f, Low: %.2f, "
+                               "Close: %.2f, Last: %.2f, "
+                               " Trades: %d, Volume: %d"
+                               % (high, low, close.close, last.close,
+                                  num_trades, volume))
 
-            self.scene.setScales(self.DAY_START, min_index, max_index)
+            if high == low:
+                low = 0
+
+            self.scene.setScales(self.DAY_START, low, high)
 
             points = zip(times, map(lambda x: self.PLOT_BOTTOM -
                                     self.PLOT_PADDING - self.PLOT_PIXELS *
-                                    (x - min_index) / (max_index - min_index),
+                                    (x - low) / (high - low),
                                     index))
 
             path = QtGui.QPainterPath()
@@ -300,7 +318,7 @@ class MainWindow(QtGui.QWidget):
                 path.lineTo(p[0], p[1])
 
             self.draw_time_axis()
-            self.draw_value_axis(min_index, max_index)
+            self.draw_value_axis(low, high)
             pathitem = self.scene.addPath(path)
             pathitem.setPen(QtGui.QPen(QtGui.QColor("red")))
             self.scene.plotted = True
