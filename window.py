@@ -29,7 +29,7 @@ from scene import PlotScene
 
 class MainWindow(QtGui.QWidget):
 
-    DAY_START = 7
+    DAY_START = 10
     DAY_END = 18
     HOURS = DAY_END - DAY_START
     TIME_PIXELS = 60 * HOURS
@@ -76,6 +76,7 @@ class MainWindow(QtGui.QWidget):
         ind_label = QtGui.QLabel("Indicator:")
         self.ind_combo = QtGui.QComboBox()
         ind_label.setBuddy(self.ind_combo)
+        self.ind_combo.addItems(['Open', 'Trade', 'Volume'])
 
         self.live_check = QtGui.QCheckBox("Live graph")
         self.graph_button = QtGui.QPushButton("Graph data")
@@ -146,8 +147,8 @@ class MainWindow(QtGui.QWidget):
 
     def populate_widgets(self):
         codes = Code.query.order_by(Code.code).all()
+        self.trade_combo.clear()
         self.trade_combo.addItems([code.code for code in codes])
-        self.ind_combo.addItems(['Open', 'Close', 'Trade', 'Volume'])
 
     def start_fetching(self):
         self.fetch_button.setEnabled(False)
@@ -179,8 +180,8 @@ class MainWindow(QtGui.QWidget):
                 os.path.dirname(os.path.realpath(__file__)), "csv")
             if not os.path.isdir(csv_folder):
                 os.mkdir(csv_folder)
-            fname = os.path.join(csv_folder, fname[fname.find("dse"):-1] \
-                    .replace(':', '-'))
+            fname = os.path.join(csv_folder,
+                                 fname[fname.find("dse"):-1].replace(':', '-'))
 
             trade_at = datetime.datetime.strptime(fname[-23:-4],
                                                   "%Y-%m-%dT%H-%M-%S")
@@ -193,15 +194,15 @@ class MainWindow(QtGui.QWidget):
 
             msg = "Saved data at %s" % trade_at.isoformat()
 
+            if self.trade_combo.currentText() == "":
+                self.populate_widgets()
+
             if self.live_check.checkState() == QtCore.Qt.Checked:
                 self.plot_graph()
         else:
             msg = "Error downloading data: %s" % str(status.toInt())
 
         self.status.setText(msg)
-        self.trade_combo.clear()
-        self.ind_combo.clear()
-        self.populate_widgets()
 
     def save_data(self, trade_at, data):
         data = str(data).split('\r\n')[1:]
@@ -220,11 +221,15 @@ class MainWindow(QtGui.QWidget):
                 trade = Trade.query.filter_by(code=code,
                                               trade_at=trade_at).one()
             except:
-                Trade(code=code, trade_at=trade_at,
-                      open=float(d[3]), close=float(d[6]),
-                      high=float(d[4]), low=float(d[5]),
-                      last=float(d[7]), change=float(d[8]),
+                Trade(code=code, trade_at=trade_at, open=float(d[3]),
                       trade=int(d[9]), volume=int(d[10]))
+
+            try:
+                close = Close.query.filter_by(code=code,
+                                              day=trade_at.date()).one()
+                close.close = float(d[4])
+            except:
+                Close(code=code, day=trade_at.date(), close=float(d[4]))
 
         session.commit()
 
@@ -263,7 +268,6 @@ class MainWindow(QtGui.QWidget):
 
         indexes = {
             'Open': lambda x: x.open,
-            'Close': lambda x: x.close,
             'Trade': lambda x: x.trade,
             'Volume': lambda x: x.volume,
         }

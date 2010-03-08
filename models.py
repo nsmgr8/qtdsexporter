@@ -43,10 +43,6 @@ class Code(Entity):
 class Trade(Entity):
 
     open = Field(Float)
-    close = Field(Float)
-    high = Field(Float)
-    low = Field(Float)
-    last = Field(Float)
     trade = Field(Integer)
     volume = Field(Integer)
 
@@ -66,4 +62,15 @@ class Trade(Entity):
     @classmethod
     def get_by_code(cls, code, day):
         return cls.get_by_day(day).filter_by(code=code)
+
+
+class Close(Entity):
+
+    close = Field(Float, required=True)
+    day = Field(Date, required=True)
+
+    code = ManyToOne("Code")
+
+    def __repr__(self):
+        return "<Close: %.2f %s>" % (self.close, self.day)
 
