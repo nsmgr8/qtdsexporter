@@ -367,8 +367,8 @@ class MainWindow(QtGui.QWidget):
             tick = self.scene.addLine(self.PLOT_LEFT, i, self.PLOT_RIGHT, i)
             tick.setPen(QtGui.QPen(QtGui.QColor(0xAA, 0xAA, 0xAA, 100)))
 
-            y = (maxx + minx) - (dx * (i - (self.PLOT_TOP + self.PLOT_PADDING))
-                                 / self.PLOT_PIXELS + minx)
+            y = maxx - (dx * (i - (self.PLOT_TOP + self.PLOT_PADDING)) /
+                        self.PLOT_PIXELS)
             text = QtGui.QGraphicsTextItem("%.0f" % y)
             text.setPos(self.PLOT_RIGHT, i-10)
             self.scene.addItem(text)
