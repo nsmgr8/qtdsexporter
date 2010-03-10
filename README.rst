@@ -18,12 +18,13 @@ occur using this data.
 Installation
 ============
 
-The software requires `PyQt`_, `SQLAlchemy`_, `Elixir`_, `SQLite`_ to be
-installed. Following is a quick installation for Ubuntu/Debian Linux:
+The software requires `PyQt`_, `SQLAlchemy`_, `Elixir`_, `SQLite`_,
+`Matplotlib`_ to be installed. Following is a quick installation for
+Ubuntu/Debian Linux:
 
 Requirements::
 
-    sudo apt-get install python-qt4 python-elixir
+    sudo apt-get install python-qt4 python-elixir python-matplotlib
 
 Now, download the `source code`_, unzip it in a folder and run.
 
@@ -47,6 +48,7 @@ Thanks!
 .. _SQLAlchemy: http://www.sqlalchemy.org/
 .. _Elixir: http://elixir.ematia.de/trac/wiki
 .. _SQLite: http://www.sqlite.org/
+.. _Matplotlib: http://matplotlib.sourceforge.net/
 .. _source code: http://github.com/nsmgr8/qtdsexporter/zipball/master
 .. _Issues: http://github.com/nsmgr8/qtdsexporter/issues
 .. _github: http://github.com
