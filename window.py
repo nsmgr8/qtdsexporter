@@ -23,30 +23,14 @@ import datetime
 
 from PyQt4 import QtCore, QtGui, QtNetwork
 
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
+
+
 from models import *
-from scene import PlotScene
 
 
 class MainWindow(QtGui.QWidget):
-
-    DAY_START = 10
-    DAY_END = 18
-    HOURS = DAY_END - DAY_START
-    TIME_PIXELS = 60 * HOURS
-    PLOT_PIXELS = 270  # divisible by 9
-
-    TIME_TICK = TIME_PIXELS / HOURS
-    PLOT_TICK = PLOT_PIXELS / 9
-
-    PLOT_PADDING = 20
-
-    PLOT_LEFT = 120
-    PLOT_RIGHT = TIME_PIXELS + PLOT_LEFT + 2 * PLOT_PADDING
-    PLOT_TOP = 10
-    PLOT_BOTTOM = PLOT_PIXELS + PLOT_TOP + 2 * PLOT_PADDING
-
-    SCENE_WIDTH = PLOT_RIGHT + 50
-    SCENE_HEIGHT = PLOT_BOTTOM + 30
 
     def __init__(self, parent=None):
         super(MainWindow, self).__init__(parent)
@@ -85,17 +69,16 @@ class MainWindow(QtGui.QWidget):
         self.stop_button = QtGui.QPushButton("Stop fetching")
         self.stop_button.setEnabled(False)
 
-        self.scene = PlotScene(0, 0, self.SCENE_WIDTH, self.SCENE_HEIGHT);
-        self.scene.setBackgroundBrush(QtGui.QColor(0xFF, 0xFF, 0xEE))
-        self.scene.setPlotProps(self.PLOT_PADDING, self.PLOT_LEFT, self.PLOT_TOP,
-                                self.PLOT_RIGHT, self.PLOT_BOTTOM)
-        self.canvas = QtGui.QGraphicsView(self.scene)
-        self.canvas.setCursor(QtCore.Qt.CrossCursor)
-
         self.status = QtGui.QLabel("Ready")
         self.coords = QtGui.QLabel()
         self.coords.setAlignment(QtCore.Qt.AlignRight)
-        self.scene.setStatusLabel(self.coords)
+
+        figure = Figure((5.0, 4.0))
+        self.canvas = FigureCanvas(figure)
+        FigureCanvas.setSizePolicy(self.canvas, QtGui.QSizePolicy.Expanding,
+                                   QtGui.QSizePolicy.Expanding)
+        self.axes = figure.add_subplot(111)
+        self.axes.grid(True)
 
         hbox_trade = QtGui.QHBoxLayout()
         hbox_trade.addWidget(trade_label)
@@ -271,8 +254,7 @@ class MainWindow(QtGui.QWidget):
                                                              indicator,
                                                              date.isoformat())
         if len(trades) == 0:
-            self.scene.clear()
-            self.scene.addText(NO_DATA_MSG)
+            self.axes.cla()
             return
 
         indexes = {
@@ -281,97 +263,34 @@ class MainWindow(QtGui.QWidget):
             'Volume': lambda x: x.volume,
         }
 
-        times, index, opens = [], [], []
-        for trade in trades:
-            times.append(trade.trade_at.minute + (trade.trade_at.hour -
-                         self.DAY_START) * 60 + self.PLOT_PADDING +
-                         self.PLOT_LEFT)
-            index.append(indexes[indicator](trade))
-            opens.append(trade.open)
+        times = [trade.trade_at for trade in trades]
+        index = [indexes[indicator](trade) for trade in trades]
+        opens = [trade.open for trade in trades]
+
+        self.axes.cla()
+        self.axes.plot(times, index, 'r')
+        self.axes.grid(True)
+        self.canvas.draw()
 
         close = Close.query.filter_by(code=code, day=date.date()).one()
         last = Close.query.filter_by(code=code, day=day_before).one()
         num_trades = trades[-1].trade
         volume = trades[-1].volume
 
-        self.scene.clear()
-        try:
-            high, low = max(opens), min(opens)
-            texts = (
-                ("Code: %s", code.code),
-                ("High: %.2f", high),
-                ("Low: %.2f", low),
-                ("Close: %.2f", close.close),
-                ("Last: %.2f", last.close),
-                ("Change: %+.2f", close.close - last.close),
-                ("Change: %+.2f%%", (close.close - last.close) / last.close *
-                 100),
-                ("Trade: %d", num_trades),
-                ("Volume: %d", volume),
-            )
 
-            for i in range(len(texts)):
-                text = self.scene.addText(texts[i][0] % texts[i][1])
-                text.setPos(0, i*20)
-
-            high, low = max(index), min(index)
-            if high == low:
-                low = 0
-
-            self.scene.setScales(self.DAY_START, low, high)
-
-            points = zip(times, map(lambda x: self.PLOT_BOTTOM -
-                                    self.PLOT_PADDING - self.PLOT_PIXELS *
-                                    (x - low) / (high - low),
-                                    index))
-
-            path = QtGui.QPainterPath()
-            path.moveTo(points[0][0], points[0][1])
-            for p in points:
-                path.lineTo(p[0], p[1])
-
-            self.draw_time_axis()
-            self.draw_value_axis(low, high)
-            pathitem = self.scene.addPath(path)
-            pathitem.setPen(QtGui.QPen(QtGui.QColor("red")))
-            self.scene.plotted = True
-        except Exception, e:
-            print(e)
-            self.scene.plotted = False
-            self.scene.addText(NO_DATA_MSG)
-
-    def draw_time_axis(self):
-        self.scene.addLine(QtCore.QLineF(self.PLOT_LEFT, self.PLOT_TOP,
-                                         self.PLOT_RIGHT, self.PLOT_TOP))
-        self.scene.addLine(QtCore.QLineF(self.PLOT_LEFT, self.PLOT_BOTTOM,
-                                         self.PLOT_RIGHT, self.PLOT_BOTTOM))
-
-        for i in range(self.PLOT_LEFT+self.PLOT_PADDING, self.PLOT_RIGHT,
-                       self.TIME_TICK):
-            tick = self.scene.addLine(i, self.PLOT_TOP, i, self.PLOT_BOTTOM)
-            tick.setPen(QtGui.QPen(QtGui.QColor(0x35, 0xFF, 0xAA, 100)))
-            text = QtGui.QGraphicsTextItem("%02d:00" % ((i - self.PLOT_LEFT) /
-                                                        60 + self.DAY_START))
-            text.setPos(i - 20, self.PLOT_BOTTOM)
-            self.scene.addItem(text)
-
-    def draw_value_axis(self, minx, maxx):
-        self.scene.addLine(QtCore.QLineF(self.PLOT_LEFT, self.PLOT_TOP,
-                                         self.PLOT_LEFT, self.PLOT_BOTTOM))
-        self.scene.addLine(QtCore.QLineF(self.PLOT_RIGHT, self.PLOT_TOP,
-                                         self.PLOT_RIGHT, self.PLOT_BOTTOM))
-
-        dx = (maxx - minx)
-        for i in range(self.PLOT_TOP+self.PLOT_PADDING, self.PLOT_BOTTOM,
-                       self.PLOT_TICK):
-            tick = self.scene.addLine(self.PLOT_LEFT, i, self.PLOT_RIGHT, i)
-            tick.setPen(QtGui.QPen(QtGui.QColor(0xAA, 0xAA, 0xAA, 100)))
-
-            y = maxx - (dx * (i - (self.PLOT_TOP + self.PLOT_PADDING)) /
-                        self.PLOT_PIXELS)
-            text = QtGui.QGraphicsTextItem("%.0f" % y)
-            text.setPos(self.PLOT_RIGHT, i-10)
-            self.scene.addItem(text)
+        high, low = max(opens), min(opens)
+        texts = (
+            ("Code: %s", code.code),
+            ("High: %.2f", high),
+            ("Low: %.2f", low),
+            ("Close: %.2f", close.close),
+            ("Last: %.2f", last.close),
+            ("Change: %+.2f", close.close - last.close),
+            ("Change: %+.2f%%", (close.close - last.close) / last.close *
+             100),
+            ("Trade: %d", num_trades),
+            ("Volume: %d", volume),
+        )
 
     def live_plot(self):
         check = self.live_check.checkState()
