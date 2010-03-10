@@ -267,16 +267,10 @@ class MainWindow(QtGui.QWidget):
         index = [indexes[indicator](trade) for trade in trades]
         opens = [trade.open for trade in trades]
 
-        self.axes.cla()
-        self.axes.plot(times, index, 'r')
-        self.axes.grid(True)
-        self.canvas.draw()
-
         close = Close.query.filter_by(code=code, day=date.date()).one()
         last = Close.query.filter_by(code=code, day=day_before).one()
         num_trades = trades[-1].trade
         volume = trades[-1].volume
-
 
         high, low = max(opens), min(opens)
         texts = (
@@ -291,6 +285,14 @@ class MainWindow(QtGui.QWidget):
             ("Trade: %d", num_trades),
             ("Volume: %d", volume),
         )
+
+        text = ' '.join([t[0] % t[1] for t in texts])
+
+        self.axes.cla()
+        self.axes.plot(times, index, 'r')
+        self.axes.text(0.025, 0.95, text, transform=self.axes.transAxes)
+        self.axes.grid(True)
+        self.canvas.draw()
 
     def live_plot(self):
         check = self.live_check.checkState()
