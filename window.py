@@ -26,15 +26,15 @@ from PyQt4 import QtCore, QtGui, QtNetwork
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 
-
 from models import *
 
-
-class MainWindow(QtGui.QWidget):
+class MainWindow(QtGui.QMainWindow):
 
     def __init__(self, parent=None):
         super(MainWindow, self).__init__(parent)
         self.window().setWindowTitle("QtDSExporter")
+        self.mdi = QtGui.QMdiArea()
+        self.setCentralWidget(self.mdi)
 
         setup_all()
         create_all()
@@ -43,108 +43,63 @@ class MainWindow(QtGui.QWidget):
         self.timer = QtCore.QTimer()
         self.timer.setInterval(50000)
 
-        self.create_layout()
-        self.create_connections()
+        self.symbol_window = QtGui.QListWidget()
+        self.symbol_window.window().setWindowTitle("Symbols")
+        self.mdi.addSubWindow(self.symbol_window)
+
         self.populate_widgets()
-
-    def create_layout(self):
-        trade_label = QtGui.QLabel("Trade code:")
-        self.trade_combo = QtGui.QComboBox()
-        trade_label.setBuddy(self.trade_combo)
-
-        date_label = QtGui.QLabel("Date:")
-        self.date_picker = QtGui.QDateEdit()
-        self.date_picker.setDisplayFormat("MMM d, yyyy")
-        self.date_picker.setDate(QtCore.QDate.currentDate())
-        date_label.setBuddy(self.date_picker)
-
-        ind_label = QtGui.QLabel("Indicator:")
-        self.ind_combo = QtGui.QComboBox()
-        ind_label.setBuddy(self.ind_combo)
-        self.ind_combo.addItems(['Open', 'Trade', 'Volume'])
-
-        self.live_check = QtGui.QCheckBox("Live graph")
-        self.graph_button = QtGui.QPushButton("Graph data")
-        self.fetch_button = QtGui.QPushButton("Start fetching")
-        self.stop_button = QtGui.QPushButton("Stop fetching")
-        self.stop_button.setEnabled(False)
-
-        self.status = QtGui.QLabel("Ready")
-        self.coords = QtGui.QLabel()
-        self.coords.setAlignment(QtCore.Qt.AlignRight)
 
         figure = Figure((5.0, 4.0))
         self.canvas = FigureCanvas(figure)
+        self.canvas.window().setWindowTitle("Graph")
         FigureCanvas.setSizePolicy(self.canvas, QtGui.QSizePolicy.Expanding,
                                    QtGui.QSizePolicy.Expanding)
         self.axes = figure.add_subplot(111)
         self.axes.grid(True)
+        self.mdi.addSubWindow(self.canvas)
 
-        hbox_trade = QtGui.QHBoxLayout()
-        hbox_trade.addWidget(trade_label)
-        hbox_trade.addWidget(self.trade_combo)
+        self.create_status_bar()
+        self.create_connections()
 
-        hbox_date = QtGui.QHBoxLayout()
-        hbox_date.addWidget(ind_label)
-        hbox_date.addWidget(self.ind_combo)
+    def create_status_bar(self):
+        self.status = QtGui.QLabel("Ready")
+        self.fetch_check = QtGui.QCheckBox("Fetch new data")
 
-        vbox1 = QtGui.QVBoxLayout()
-        vbox1.addLayout(hbox_trade)
-        vbox1.addLayout(hbox_date)
+        hbox1 = QtGui.QHBoxLayout()
+        hbox1.addWidget(self.status)
+        hbox1.addStretch()
+        hbox1.addWidget(self.fetch_check)
 
-        hbox_ind = QtGui.QHBoxLayout()
-        hbox_ind.addWidget(date_label)
-        hbox_ind.addWidget(self.date_picker)
-        hbox_ind.addStretch()
+        widget = QtGui.QWidget()
+        widget.setLayout(hbox1)
+        self.statusBar().addWidget(widget)
 
-        hbox_graph = QtGui.QHBoxLayout()
-        hbox_graph.addWidget(self.graph_button)
-        hbox_graph.addWidget(self.live_check)
-        hbox_graph.addStretch()
-
-        vbox2 = QtGui.QVBoxLayout()
-        vbox2.addLayout(hbox_ind)
-        vbox2.addLayout(hbox_graph)
-
-        vbox_buttons = QtGui.QVBoxLayout()
-        vbox_buttons.addWidget(self.fetch_button)
-        vbox_buttons.addWidget(self.stop_button)
-
-        grid = QtGui.QGridLayout(self)
-        grid.addLayout(vbox1, 0, 0)
-        grid.addLayout(vbox2, 0, 1)
-        grid.addLayout(vbox_buttons, 0, 3)
-        grid.addWidget(self.canvas, 1, 0, 1, 4)
-        grid.addWidget(self.status, 2, 0, 1, 3)
-        grid.addWidget(self.coords, 2, 3)
 
     def create_connections(self):
-        self.connect(self.graph_button, QtCore.SIGNAL("clicked()"),
-                     self.plot_graph)
-        self.connect(self.fetch_button, QtCore.SIGNAL("clicked()"),
-                     self.start_fetching)
-        self.connect(self.stop_button, QtCore.SIGNAL("clicked()"),
-                     self.stop_fetching)
-        self.connect(self.live_check, QtCore.SIGNAL("stateChanged(int)"),
-                     self.live_plot)
+        self.connect(self.fetch_check, QtCore.SIGNAL("stateChanged(int)"),
+                     self.fetch)
         self.connect(self.timer, QtCore.SIGNAL("timeout()"), self.make_request)
+        self.connect(self.symbol_window, QtCore.SIGNAL("currentItemChanged ("
+            "QListWidgetItem*, QListWidgetItem*)"), self.plot_graph)
 
     def populate_widgets(self):
         codes = Code.query.order_by(Code.code).all()
-        self.trade_combo.clear()
-        self.trade_combo.addItems([code.code for code in codes])
+        self.symbol_window.clear()
+        self.symbol_window.addItems([code.code for code in codes])
+
+    def fetch(self):
+        check = self.fetch_check.checkState()
+        if check == QtCore.Qt.Checked:
+            self.start_fetching()
+        elif check == QtCore.Qt.Unchecked:
+            self.stop_fetching()
+
 
     def start_fetching(self):
-        self.fetch_button.setEnabled(False)
-        self.stop_button.setEnabled(True)
-
         self.timer.start()
         self.make_request()
 
     def stop_fetching(self):
-        self.fetch_button.setEnabled(True)
-        self.stop_button.setEnabled(False)
-
         self.timer.stop()
         self.status.setText("Ready")
 
@@ -175,15 +130,9 @@ class MainWindow(QtGui.QWidget):
                 f.write(data)
 
             self.save_data(trade_at, data)
+            self.plot_graph()
 
             msg = "Saved data at %s" % trade_at.isoformat()
-
-            current_code = self.trade_combo.currentText()
-            self.populate_widgets()
-            self.trade_combo.setCurrentIndex(self.trade_combo.findText(current_code))
-
-            if self.live_check.checkState() == QtCore.Qt.Checked:
-                self.plot_graph()
         else:
             msg = "Error downloading data: %s" % str(status.toInt())
 
@@ -241,31 +190,19 @@ class MainWindow(QtGui.QWidget):
                     print("%s: %d" % (fname, Trade.query.count()))
 
     def plot_graph(self):
-        code = Code.get_by(code=unicode(self.trade_combo.currentText()))
-        indicator = unicode(self.ind_combo.currentText())
-        date = self.date_picker.date()
-        date = datetime.datetime(day=date.day(), month=date.month(),
-                                 year=date.year())
-        day_before = date.date() - datetime.timedelta(days=1)
+        code = unicode(self.symbol_window.currentItem().text())
+        code = Code.get_by(code=code)
+        trades = Trade.get_by_code(code).order_by(Trade.trade_at).all()
 
-        trades = Trade.get_by_code(code, date).order_by(Trade.trade_at).all()
-
-        NO_DATA_MSG = "No data available for %s:%s at %s" % (code.code,
-                                                             indicator,
-                                                             date.isoformat())
         if len(trades) == 0:
             self.axes.cla()
             return
 
-        indexes = {
-            'Open': lambda x: x.open,
-            'Trade': lambda x: x.trade,
-            'Volume': lambda x: x.volume,
-        }
-
         times = [trade.trade_at for trade in trades]
-        index = [indexes[indicator](trade) for trade in trades]
         opens = [trade.open for trade in trades]
+
+        date = datetime.datetime.now()
+        day_before = date.date() - datetime.timedelta(days=1)
 
         close = Close.query.filter_by(code=code, day=date.date()).one()
         last = Close.query.filter_by(code=code, day=day_before).one()
@@ -289,17 +226,8 @@ class MainWindow(QtGui.QWidget):
         text = ' '.join([t[0] % t[1] for t in texts])
 
         self.axes.cla()
-        self.axes.plot(times, index, 'r')
+        self.axes.plot(times, opens, 'r')
         self.axes.text(0.025, 0.95, text, transform=self.axes.transAxes)
         self.axes.grid(True)
         self.canvas.draw()
-
-    def live_plot(self):
-        check = self.live_check.checkState()
-        if check == QtCore.Qt.Checked:
-            self.date_picker.setDate(QtCore.QDate.currentDate())
-            self.date_picker.setEnabled(False)
-            self.plot_graph()
-        elif check == QtCore.Qt.Unchecked:
-            self.date_picker.setEnabled(True)
 

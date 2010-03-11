@@ -60,8 +60,15 @@ class Trade(Entity):
         return cls.query.filter(between(cls.trade_at, day, day_after))
 
     @classmethod
-    def get_by_code(cls, code, day):
-        return cls.get_by_day(day).filter_by(code=code)
+    def get_by_code(cls, code, from_=None, to=None):
+        if not to:
+            to = datetime.datetime.now()
+
+        if not from_:
+            from_ = to - datetime.timedelta(days=30)
+
+        return cls.query.filter_by(code=code).filter(between(cls.trade_at,
+                                                             from_, to))
 
 
 class Close(Entity):
