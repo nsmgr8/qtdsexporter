@@ -19,12 +19,17 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 
 import os
+import csv
 import datetime
+import cStringIO as StringIO
 
-from PyQt4 import QtCore, QtGui, QtNetwork
+from PyQt4 import QtCore, QtGui, QtNetwork, QtWebKit
 
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt4agg import NavigationToolbar2QTAgg as NavigationToolbar
+
+import matplotlib.mlab as mlab
 
 from models import *
 
@@ -49,14 +54,33 @@ class MainWindow(QtGui.QMainWindow):
 
         self.populate_widgets()
 
+        #self.info_view = QtWebKit.QWebView()
+        #self.info_view.window().setWindowTitle("Info")
+        #self.info_view.window().setMaximumSize(100, 200)
+        #self.mdi.addSubWindow(self.info_view)
+
         figure = Figure((5.0, 4.0))
         self.canvas = FigureCanvas(figure)
         self.canvas.window().setWindowTitle("Graph")
         FigureCanvas.setSizePolicy(self.canvas, QtGui.QSizePolicy.Expanding,
                                    QtGui.QSizePolicy.Expanding)
-        self.axes = figure.add_subplot(111)
-        self.axes.grid(True)
-        self.mdi.addSubWindow(self.canvas)
+
+        plot_widget = QtGui.QWidget()
+        vbox = QtGui.QVBoxLayout(plot_widget)
+        vbox.addWidget(self.canvas)
+        vbox.addWidget(NavigationToolbar(self.canvas, plot_widget))
+
+        left, width = 0.1, 0.8
+        rect1 = [left, 0.7, width, 0.2]
+        rect2 = [left, 0.3, width, 0.4]
+        rect3 = [left, 0.1, width, 0.2]
+
+        self.axes1 = figure.add_axes(rect1)
+        self.axes2 = figure.add_axes(rect2, sharex=self.axes1)
+        self.axes3 = figure.add_axes(rect3, sharex=self.axes1)
+
+        self.axes1.grid(True)
+        self.mdi.addSubWindow(plot_widget)
 
         self.create_status_bar()
         self.create_connections()
@@ -195,39 +219,54 @@ class MainWindow(QtGui.QMainWindow):
         trades = Trade.get_by_code(code).order_by(Trade.trade_at).all()
 
         if len(trades) == 0:
-            self.axes.cla()
+            self.axes1.cla()
             return
 
-        times = [trade.trade_at for trade in trades]
-        opens = [trade.open for trade in trades]
+        csvfile = StringIO.StringIO()
+        csvwriter = csv.writer(csvfile)
+        heads = ['DateTime', 'Open', 'Trade', 'Volume']
+        csvwriter.writerow(heads)
 
-        date = datetime.datetime.now()
-        day_before = date.date() - datetime.timedelta(days=1)
+        traderows = [(trade.trade_at, trade.open, trade.trade, trade.volume)
+                  for trade in trades]
+        for row in traderows:
+            csvwriter.writerow(row)
 
-        close = Close.query.filter_by(code=code, day=date.date()).one()
-        last = Close.query.filter_by(code=code, day=day_before).one()
-        num_trades = trades[-1].trade
-        volume = trades[-1].volume
+        csvfile.seek(0)
+        r = mlab.csv2rec(csvfile)
+        csvfile.close()
 
-        high, low = max(opens), min(opens)
-        texts = (
-            ("Code: %s", code.code),
-            ("High: %.2f", high),
-            ("Low: %.2f", low),
-            ("Close: %.2f", close.close),
-            ("Last: %.2f", last.close),
-            ("Change: %+.2f", close.close - last.close),
-            ("Change: %+.2f%%", (close.close - last.close) / last.close *
-             100),
-            ("Trade: %d", num_trades),
-            ("Volume: %d", volume),
-        )
+        #date = datetime.datetime.now()
+        #day_before = date.date() - datetime.timedelta(days=1)
 
-        text = ' '.join([t[0] % t[1] for t in texts])
+        #close = Close.query.filter_by(code=code, day=date.date()).one()
+        #last = Close.query.filter_by(code=code, day=day_before).one()
+        #num_trades = trades[-1].trade
+        #volume = trades[-1].volume
 
-        self.axes.cla()
-        self.axes.plot(times, opens, 'r')
-        self.axes.text(0.025, 0.95, text, transform=self.axes.transAxes)
-        self.axes.grid(True)
+        #high, low = max(r.open), min(r.open)
+        #texts = (
+            #("<b>Code</b>: %s", code.code),
+            #("<b>High</b>: %.2f", high),
+            #("<b>Low</b>: %.2f", low),
+            #("<b>Close</b>: %.2f", close.close),
+            #("<b>Last</b>: %.2f", last.close),
+            #("<b>Change</b>: %+.2f", close.close - last.close),
+            #("<b>Change</b>: %+.2f%%", (close.close - last.close) / last.close *
+             #100),
+            #("<b>Trade</b>: %d", num_trades),
+            #("<b>Volume</b>: %d", volume),
+        #)
+
+        #text = '<br />'.join([t[0] % t[1] for t in texts])
+
+        self.axes1.cla()
+        self.axes2.cla()
+        self.axes3.cla()
+        self.axes1.plot(r.datetime, r.open, 'r')
+        self.axes2.plot(r.datetime, r.open, 'r')
+        self.axes3.plot(r.datetime, r.open, 'r')
+        #self.info_view.setHtml(text)
+        self.axes1.grid(True)
         self.canvas.draw()
 
