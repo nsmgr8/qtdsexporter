@@ -22,16 +22,18 @@ import os
 import csv
 import datetime
 import cStringIO as StringIO
+import string
 
-from PyQt4 import QtCore, QtGui, QtNetwork, QtWebKit
+from PyQt4 import QtCore, QtGui, QtNetwork
 
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt4agg import NavigationToolbar2QTAgg as NavigationToolbar
 
+import numpy as np
 import matplotlib.mlab as mlab
 
-from models import *
+import pymongo
 
 class MainWindow(QtGui.QMainWindow):
 
@@ -41,8 +43,8 @@ class MainWindow(QtGui.QMainWindow):
         self.mdi = QtGui.QMdiArea()
         self.setCentralWidget(self.mdi)
 
-        setup_all()
-        create_all()
+        self.connection = pymongo.Connection()
+        self.db = self.connection.qtdsexporter.dse
 
         self.nam = QtNetwork.QNetworkAccessManager(self)
         self.timer = QtCore.QTimer()
@@ -53,11 +55,6 @@ class MainWindow(QtGui.QMainWindow):
         self.mdi.addSubWindow(self.symbol_window)
 
         self.populate_widgets()
-
-        #self.info_view = QtWebKit.QWebView()
-        #self.info_view.window().setWindowTitle("Info")
-        #self.info_view.window().setMaximumSize(100, 200)
-        #self.mdi.addSubWindow(self.info_view)
 
         figure = Figure((5.0, 4.0))
         self.canvas = FigureCanvas(figure)
@@ -76,8 +73,8 @@ class MainWindow(QtGui.QMainWindow):
         rect3 = [left, 0.1, width, 0.2]
 
         self.axes1 = figure.add_axes(rect1)
-        self.axes2 = figure.add_axes(rect2, sharex=self.axes1)
-        self.axes3 = figure.add_axes(rect3, sharex=self.axes1)
+        self.axes2 = figure.add_axes(rect2)#, sharex=self.axes1)
+        self.axes3 = figure.add_axes(rect3)#, sharex=self.axes1)
 
         self.axes1.grid(True)
         self.mdi.addSubWindow(plot_widget)
@@ -107,9 +104,9 @@ class MainWindow(QtGui.QMainWindow):
             "QListWidgetItem*, QListWidgetItem*)"), self.plot_graph)
 
     def populate_widgets(self):
-        codes = Code.query.order_by(Code.code).all()
         self.symbol_window.clear()
-        self.symbol_window.addItems([code.code for code in codes])
+        self.symbol_window.addItems(sorted([code['symbol'] for code in
+                                            self.db.codes.find()]))
 
     def fetch(self):
         check = self.fetch_check.checkState()
@@ -163,39 +160,48 @@ class MainWindow(QtGui.QMainWindow):
         self.status.setText(msg)
 
     def save_data(self, trade_at, data):
+        day_start = '11:00:00'
+        day_end = '15:06:00'
         data = str(data).split('\r\n')[1:]
         for d in data:
-            d = d.split(',')
+            d = map(string.strip, d.split(','))
             if len(d) < 11:
+                print "malformed data:", d
                 continue
-            d = map(unicode, d)
 
-            try:
-                code = Code.query.filter_by(code=d[0]).one()
-            except:
-                code = Code(code=d[0])
+            if d[2] < day_start or d[2] > day_end:
+                print "out of trading time:", d[2]
+                continue
 
-            try:
-                trade = Trade.query.filter_by(code=code,
-                                              trade_at=trade_at).one()
-            except:
-                Trade(code=code, trade_at=trade_at, open=float(d[3]),
-                      trade=int(d[9]), volume=int(d[10]))
+            d[1] = d[1][-4:] + d[1][:2] + d[1][3:5]
+            d[2] = d[2].replace(':', '')
 
-            try:
-                close = Close.query.filter_by(code=code,
-                                              day=trade_at.date()).one()
-                close.close = float(d[6])
-            except:
-                Close(code=code, day=trade_at.date(), close=float(d[6]))
+            self.db.codes.insert({
+                '_id': d[0],
+                'symbol': d[0],
+            })
 
-            try:
-                yesterday = trade_at.date() - datetime.timedelta(days=1)
-                Close.query.filter_by(code=code, day=yesterday).one()
-            except Exception, e:
-                Close(code=code, day=yesterday, close=float(d[7]))
+            self.db.trades.insert({
+                '_id': '_'.join(d[:3]),
+                'code': d[0],
+                'date': d[1],
+                'time': d[2],
+                'open': d[3],
+            })
 
-        session.commit()
+            if d[6] != '0':
+                self.db.close.insert({
+                    '_id': '_'.join(d[:2]),
+                    'code': d[0],
+                    'date': d[1],
+                    'open': d[3],
+                    'high': d[4],
+                    'low': d[5],
+                    'close': d[6],
+                    'last': d[7],
+                    'trade': d[9],
+                    'volume': d[10],
+                })
 
     def load_data(self):
         dirname = os.path.join(os.path.dirname(os.path.realpath(__file__)),
@@ -208,65 +214,69 @@ class MainWindow(QtGui.QMainWindow):
                     trade_at = datetime.datetime.strptime(fname[-23:-4],
                                                           "%Y-%m-%dT%H-%M-%S")
 
-                    with open(fname, 'r') as csv:
-                        self.save_data(trade_at, csv.read())
+                    with open(fname, 'r') as f:
+                        self.save_data(trade_at, f.read())
 
-                    print("%s: %d" % (fname, Trade.query.count()))
+                    print("%s: %d" % (fname, self.db.trades.count()))
+            self.populate_widgets()
 
     def plot_graph(self):
-        code = unicode(self.symbol_window.currentItem().text())
-        code = Code.get_by(code=code)
-        trades = Trade.get_by_code(code).order_by(Trade.trade_at).all()
+        self.axes1.cla()
+        self.axes2.cla()
+        self.axes3.cla()
+
+        try:
+            code = unicode(self.symbol_window.currentItem().text())
+        except:
+            return
+
+        from_ = datetime.datetime.today().date() - datetime.timedelta(days=7)
+        from_ = from_.strftime("%Y%m%d")
+        trades = [(datetime.datetime.strptime(trade['date']+trade['time'], "%Y%m%d%H%M%S"),
+                  float(trade['open'])) for trade in self.db.trades.find({
+                      'code': code, 'date': {'$gte': from_}})]
 
         if len(trades) == 0:
-            self.axes1.cla()
             return
 
         csvfile = StringIO.StringIO()
         csvwriter = csv.writer(csvfile)
-        heads = ['DateTime', 'Open', 'Trade', 'Volume']
+        heads = ['DateTime', 'Open',]
         csvwriter.writerow(heads)
 
-        traderows = [(trade.trade_at, trade.open, trade.trade, trade.volume)
-                  for trade in trades]
-        for row in traderows:
+        for row in trades:
             csvwriter.writerow(row)
 
         csvfile.seek(0)
         r = mlab.csv2rec(csvfile)
         csvfile.close()
 
-        #date = datetime.datetime.now()
-        #day_before = date.date() - datetime.timedelta(days=1)
+        self.axes1.plot(r.datetime, r.open, 'ro')
 
-        #close = Close.query.filter_by(code=code, day=date.date()).one()
-        #last = Close.query.filter_by(code=code, day=day_before).one()
-        #num_trades = trades[-1].trade
-        #volume = trades[-1].volume
+        closes = [(datetime.datetime.strptime(close['date'], "%Y%m%d").date(),
+                   close['open'], close['close'], close['high'], close['low'])
+                  for close in self.db.close.find({'code': code})]
 
-        #high, low = max(r.open), min(r.open)
-        #texts = (
-            #("<b>Code</b>: %s", code.code),
-            #("<b>High</b>: %.2f", high),
-            #("<b>Low</b>: %.2f", low),
-            #("<b>Close</b>: %.2f", close.close),
-            #("<b>Last</b>: %.2f", last.close),
-            #("<b>Change</b>: %+.2f", close.close - last.close),
-            #("<b>Change</b>: %+.2f%%", (close.close - last.close) / last.close *
-             #100),
-            #("<b>Trade</b>: %d", num_trades),
-            #("<b>Volume</b>: %d", volume),
-        #)
+        csvfile = StringIO.StringIO()
+        csvwriter = csv.writer(csvfile)
+        heads = ['DateTime', 'Open', 'Close', 'High', 'Low',]
+        csvwriter.writerow(heads)
 
-        #text = '<br />'.join([t[0] % t[1] for t in texts])
+        for row in closes:
+            csvwriter.writerow(row)
 
-        self.axes1.cla()
-        self.axes2.cla()
-        self.axes3.cla()
-        self.axes1.plot(r.datetime, r.open, 'r')
-        self.axes2.plot(r.datetime, r.open, 'r')
+        csvfile.seek(0)
+        r = mlab.csv2rec(csvfile)
+        csvfile.close()
+
+        deltas = np.zeros_like(r.open)
+        deltas[1:] = np.diff(r.open)
+        up = deltas>0
+        self.axes2.vlines(r.datetime[up], r.low[up], r.high[up], color='black', label='_nolegend_')
+        self.axes2.vlines(r.datetime[~up], r.low[~up], r.high[~up], color='blue', label='_nolegend_')
+
+        #self.axes2.vlines(r.datetime, r.high, r.low, 'b')
         self.axes3.plot(r.datetime, r.open, 'r')
-        #self.info_view.setHtml(text)
         self.axes1.grid(True)
         self.canvas.draw()
 
