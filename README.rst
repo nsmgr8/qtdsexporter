@@ -18,13 +18,14 @@ occur using this data.
 Installation
 ============
 
-The software requires `PyQt`_, `SQLAlchemy`_, `Elixir`_, `SQLite`_,
-`Matplotlib`_ to be installed. Following is a quick installation for
-Ubuntu/Debian Linux:
+The software requires `PyQt`_, `MongoDB`_ `Matplotlib`_ to be installed. Following
+is a quick installation for Ubuntu/Debian Linux:
 
 Requirements::
 
-    sudo apt-get install python-qt4 python-elixir python-matplotlib
+    sudo apt-get install python-qt4 python-matplotlib
+
+And, install MongoDB following `this instruction <http://www.mongodb.org/display/DOCS/Ubuntu+and+Debian+packages>`_.
 
 Now, download the `source code`_, unzip it in a folder and run.
 
@@ -45,9 +46,7 @@ feature request. Please use the `Issues`_ page in the `github`_ site.
 Thanks!
 
 .. _PyQt: http://www.riverbankcomputing.co.uk/software/pyqt/intro
-.. _SQLAlchemy: http://www.sqlalchemy.org/
-.. _Elixir: http://elixir.ematia.de/trac/wiki
-.. _SQLite: http://www.sqlite.org/
+.. _MongoDB: http://www.mongodb.org
 .. _Matplotlib: http://matplotlib.sourceforge.net/
 .. _source code: http://github.com/nsmgr8/qtdsexporter/zipball/master
 .. _Issues: http://github.com/nsmgr8/qtdsexporter/issues
