@@ -67,14 +67,9 @@ class MainWindow(QtGui.QMainWindow):
         vbox.addWidget(self.canvas)
         vbox.addWidget(NavigationToolbar(self.canvas, plot_widget))
 
-        left, width = 0.1, 0.8
-        rect1 = [left, 0.7, width, 0.2]
-        rect2 = [left, 0.3, width, 0.4]
-        rect3 = [left, 0.1, width, 0.2]
-
-        self.axes1 = figure.add_axes(rect1)
-        self.axes2 = figure.add_axes(rect2)#, sharex=self.axes1)
-        self.axes3 = figure.add_axes(rect3)#, sharex=self.axes1)
+        self.axes1 = figure.add_subplot(311)
+        self.axes2 = figure.add_subplot(312)
+        self.axes3 = figure.add_subplot(313)
 
         self.axes1.grid(True)
         self.mdi.addSubWindow(plot_widget)
@@ -232,7 +227,8 @@ class MainWindow(QtGui.QMainWindow):
 
         from_ = datetime.datetime.today().date() - datetime.timedelta(days=7)
         from_ = from_.strftime("%Y%m%d")
-        trades = [(datetime.datetime.strptime(trade['date']+trade['time'], "%Y%m%d%H%M%S"),
+        trades = [(datetime.datetime.strptime(trade['date']+trade['time'],
+                                              "%Y%m%d%H%M%S"),
                   float(trade['open'])) for trade in self.db.trades.find({
                       'code': code, 'date': {'$gte': from_}})]
 
@@ -254,7 +250,8 @@ class MainWindow(QtGui.QMainWindow):
         self.axes1.plot(r.datetime, r.open, 'ro')
 
         closes = [(datetime.datetime.strptime(close['date'], "%Y%m%d").date(),
-                   close['open'], close['close'], close['high'], close['low'])
+                   float(close['open']), float(close['close']),
+                   float(close['high']), float(close['low']))
                   for close in self.db.close.find({'code': code})]
 
         csvfile = StringIO.StringIO()
@@ -274,6 +271,7 @@ class MainWindow(QtGui.QMainWindow):
         up = deltas>0
         self.axes2.vlines(r.datetime[up], r.low[up], r.high[up], color='black', label='_nolegend_')
         self.axes2.vlines(r.datetime[~up], r.low[~up], r.high[~up], color='blue', label='_nolegend_')
+        self.axes2.plot(r.datetime, r.open, 'r')
 
         #self.axes2.vlines(r.datetime, r.high, r.low, 'b')
         self.axes3.plot(r.datetime, r.open, 'r')
