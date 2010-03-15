@@ -151,11 +151,14 @@ class PlotWidget(QtGui.QWidget):
                             transform=self.axes1.transAxes, fontsize=textsize)
 
             try:
-                ma20 = indicators.moving_average(r.open, 20, type_='simple')
-                ma200 = indicators.moving_average(r.open, 40, type_='simple')
+                ma = indicators.moving_average(r.open, 10, type_='simple')
+                self.axes2.plot(r.datetime, ma, color='blue', lw=2, label='MA (10)')
+            except:
+                pass
 
-                self.axes2.plot(r.datetime, ma20, color='blue', lw=2, label='MA (20)')
-                self.axes2.plot(r.datetime, ma200, color='red', lw=2, label='MA (40)')
+            try:
+                ma = indicators.moving_average(r.open, 20, type_='simple')
+                self.axes2.plot(r.datetime, ma, color='red', lw=2, label='MA (20)')
             except:
                 pass
 
