@@ -19,21 +19,14 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 
 import os
-import csv
 import datetime
-import cStringIO as StringIO
 import string
 
 from PyQt4 import QtCore, QtGui, QtNetwork
 
-from matplotlib.figure import Figure
-from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qt4agg import NavigationToolbar2QTAgg as NavigationToolbar
-
-import numpy as np
-import matplotlib.mlab as mlab
-
 import pymongo
+
+from plotwidget import PlotWidget
 
 class MainWindow(QtGui.QMainWindow):
 
@@ -57,25 +50,6 @@ class MainWindow(QtGui.QMainWindow):
         self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.dock)
 
         self.populate_widgets()
-
-        figure = Figure((5.0, 4.0))
-        self.canvas = FigureCanvas(figure)
-        self.canvas.window().setWindowTitle("Graph")
-        FigureCanvas.setSizePolicy(self.canvas, QtGui.QSizePolicy.Expanding,
-                                   QtGui.QSizePolicy.Expanding)
-
-        plot_widget = QtGui.QWidget()
-        vbox = QtGui.QVBoxLayout(plot_widget)
-        vbox.addWidget(self.canvas)
-        vbox.addWidget(NavigationToolbar(self.canvas, plot_widget))
-
-        self.axes1 = figure.add_subplot(311)
-        self.axes2 = figure.add_subplot(312)
-        self.axes3 = figure.add_subplot(313)
-
-        self.axes1.grid(True)
-        self.mdi.addSubWindow(plot_widget)
-
         self.create_status_bar()
         self.create_connections()
 
@@ -140,23 +114,22 @@ class MainWindow(QtGui.QMainWindow):
             fname = os.path.join(csv_folder,
                                  fname[fname.find("dse"):-1].replace(':', '-'))
 
-            trade_at = datetime.datetime.strptime(fname[-23:-4],
-                                                  "%Y-%m-%dT%H-%M-%S")
-
             data = self.reply.readAll()
             with open(fname, 'wb') as f:
                 f.write(data)
 
-            self.save_data(trade_at, data)
+            self.save_data(data)
             self.plot_graph()
 
+            trade_at = datetime.datetime.strptime(fname[-23:-4],
+                                                  "%Y-%m-%dT%H-%M-%S")
             msg = "Saved data at %s" % trade_at.isoformat()
         else:
             msg = "Error downloading data: %s" % str(status.toInt())
 
         self.status.setText(msg)
 
-    def save_data(self, trade_at, data):
+    def save_data(self, data):
         day_start = '11:00:00'
         day_end = '15:06:00'
         data = str(data).split('\r\n')[1:]
@@ -217,62 +190,13 @@ class MainWindow(QtGui.QMainWindow):
             self.populate_widgets()
 
     def plot_graph(self):
-        self.axes1.cla()
-        self.axes2.cla()
-        self.axes3.cla()
-
         try:
             code = unicode(self.symbol_window.currentItem().text())
         except:
             return
 
-        from_ = datetime.datetime.today().date() - datetime.timedelta(days=7)
-        from_ = from_.strftime("%Y%m%d")
-        trades = [(datetime.datetime.strptime(trade['datetime'], "%Y%m%d%H%M%S"),
-                  float(trade['open'])) for trade in self.db.trades.find({
-                      'code': code, 'datetime': {'$gte': from_}})]
-
-        if len(trades) > 0:
-            csvfile = StringIO.StringIO()
-            csvwriter = csv.writer(csvfile)
-            heads = ['DateTime', 'Open',]
-            csvwriter.writerow(heads)
-
-            for row in trades:
-                csvwriter.writerow(row)
-
-            csvfile.seek(0)
-            r = mlab.csv2rec(csvfile)
-            csvfile.close()
-
-            self.axes1.plot(r.datetime, r.open, 'ro')
-
-        closes = [(datetime.datetime.strptime(close['date'], "%Y%m%d").date(),
-                   float(close['open']), float(close['close']),
-                   float(close['high']), float(close['low']))
-                  for close in self.db.close.find({'code': code})]
-
-        csvfile = StringIO.StringIO()
-        csvwriter = csv.writer(csvfile)
-        heads = ['DateTime', 'Open', 'Close', 'High', 'Low',]
-        csvwriter.writerow(heads)
-
-        for row in closes:
-            csvwriter.writerow(row)
-
-        csvfile.seek(0)
-        r = mlab.csv2rec(csvfile)
-        csvfile.close()
-
-        deltas = np.zeros_like(r.open)
-        deltas[1:] = np.diff(r.open)
-        up = deltas>0
-        self.axes2.vlines(r.datetime[up], r.low[up], r.high[up], color='black', label='_nolegend_')
-        self.axes2.vlines(r.datetime[~up], r.low[~up], r.high[~up], color='blue', label='_nolegend_')
-        self.axes2.plot(r.datetime, r.open, 'r')
-
-        #self.axes2.vlines(r.datetime, r.high, r.low, 'b')
-        self.axes3.plot(r.datetime, r.open, 'r')
-        self.axes1.grid(True)
-        self.canvas.draw()
+        plot = PlotWidget(code=code)
+        self.mdi.addSubWindow(plot)
+        plot.plot_graph()
+        plot.show()
 
