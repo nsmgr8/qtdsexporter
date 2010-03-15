@@ -44,15 +44,17 @@ class MainWindow(QtGui.QMainWindow):
         self.setCentralWidget(self.mdi)
 
         self.connection = pymongo.Connection()
-        self.db = self.connection.qtdsexporter.dse
+        self.db = self.connection.qtdsexporter
 
         self.nam = QtNetwork.QNetworkAccessManager(self)
         self.timer = QtCore.QTimer()
         self.timer.setInterval(50000)
 
-        self.symbol_window = QtGui.QListWidget()
+        self.dock = QtGui.QDockWidget("Symbols", self)
+        self.symbol_window = QtGui.QListWidget(self.dock)
         self.symbol_window.window().setWindowTitle("Symbols")
-        self.mdi.addSubWindow(self.symbol_window)
+        self.dock.setWidget(self.symbol_window)
+        self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.dock)
 
         self.populate_widgets()
 
@@ -95,8 +97,8 @@ class MainWindow(QtGui.QMainWindow):
         self.connect(self.fetch_check, QtCore.SIGNAL("stateChanged(int)"),
                      self.fetch)
         self.connect(self.timer, QtCore.SIGNAL("timeout()"), self.make_request)
-        self.connect(self.symbol_window, QtCore.SIGNAL("currentItemChanged ("
-            "QListWidgetItem*, QListWidgetItem*)"), self.plot_graph)
+        self.connect(self.symbol_window, QtCore.SIGNAL("doubleClicked("
+            "const QModelIndex&)"), self.plot_graph)
 
     def populate_widgets(self):
         self.symbol_window.clear()
@@ -179,8 +181,7 @@ class MainWindow(QtGui.QMainWindow):
             self.db.trades.insert({
                 '_id': '_'.join(d[:3]),
                 'code': d[0],
-                'date': d[1],
-                'time': d[2],
+                'datetime': d[1] + d[2],
                 'open': d[3],
             })
 
@@ -227,27 +228,24 @@ class MainWindow(QtGui.QMainWindow):
 
         from_ = datetime.datetime.today().date() - datetime.timedelta(days=7)
         from_ = from_.strftime("%Y%m%d")
-        trades = [(datetime.datetime.strptime(trade['date']+trade['time'],
-                                              "%Y%m%d%H%M%S"),
+        trades = [(datetime.datetime.strptime(trade['datetime'], "%Y%m%d%H%M%S"),
                   float(trade['open'])) for trade in self.db.trades.find({
-                      'code': code, 'date': {'$gte': from_}})]
+                      'code': code, 'datetime': {'$gte': from_}})]
 
-        if len(trades) == 0:
-            return
+        if len(trades) > 0:
+            csvfile = StringIO.StringIO()
+            csvwriter = csv.writer(csvfile)
+            heads = ['DateTime', 'Open',]
+            csvwriter.writerow(heads)
 
-        csvfile = StringIO.StringIO()
-        csvwriter = csv.writer(csvfile)
-        heads = ['DateTime', 'Open',]
-        csvwriter.writerow(heads)
+            for row in trades:
+                csvwriter.writerow(row)
 
-        for row in trades:
-            csvwriter.writerow(row)
+            csvfile.seek(0)
+            r = mlab.csv2rec(csvfile)
+            csvfile.close()
 
-        csvfile.seek(0)
-        r = mlab.csv2rec(csvfile)
-        csvfile.close()
-
-        self.axes1.plot(r.datetime, r.open, 'ro')
+            self.axes1.plot(r.datetime, r.open, 'ro')
 
         closes = [(datetime.datetime.strptime(close['date'], "%Y%m%d").date(),
                    float(close['open']), float(close['close']),
