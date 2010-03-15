@@ -36,6 +36,8 @@ class MainWindow(QtGui.QMainWindow):
         self.mdi = QtGui.QMdiArea()
         self.setCentralWidget(self.mdi)
 
+        self.plots = {}
+
         self.connection = pymongo.Connection()
         self.db = self.connection.qtdsexporter
 
@@ -184,19 +186,27 @@ class MainWindow(QtGui.QMainWindow):
                                                           "%Y-%m-%dT%H-%M-%S")
 
                     with open(fname, 'r') as f:
-                        self.save_data(trade_at, f.read())
+                        self.save_data(f.read())
 
-                    print("%s: %d" % (fname, self.db.trades.count()))
+                    print("%s: [%d, %d, %d]" % (fname, self.db.trades.count(),
+                                                self.db.close.count(),
+                                                self.db.codes.count()))
             self.populate_widgets()
 
     def plot_graph(self):
         try:
             code = unicode(self.symbol_window.currentItem().text())
-        except:
+        except Exception, e:
+            print(e)
             return
 
-        plot = PlotWidget(code=code)
-        self.mdi.addSubWindow(plot)
+        plot = self.plots.get(code, None)
+        if not plot:
+            plot = PlotWidget(code=code, plots=self.plots)
+            self.mdi.addSubWindow(plot)
+            self.plots[code] = plot
+
         plot.plot_graph()
         plot.show()
+        plot.activateWindow()
 
