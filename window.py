@@ -45,17 +45,47 @@ class MainWindow(QtGui.QMainWindow):
         self.timer = QtCore.QTimer()
         self.timer.setInterval(50000)
 
+        self.create_actions()
+        self.create_menus()
+
         self.create_symbol_dock()
-        self.load_symbols()
         self.create_status_bar()
         self.create_connections()
 
+    def create_menus(self):
+        file_menu = self.menuBar().addMenu("&File")
+        window_menu = self.menuBar().addMenu("&Window")
+        help_menu = self.menuBar().addMenu("&Help")
+
+        file_menu.addAction(self.close_action)
+        file_menu.addAction(self.quit_action)
+
+        window_menu.addAction(self.symbol_action)
+
+        help_menu.addAction(self.help_action)
+        help_menu.addAction(self.about_action)
+
+    def create_actions(self):
+        self.close_action = QtGui.QAction("&Close", self)
+        self.quit_action = QtGui.QAction("&Quit", self)
+
+        self.symbol_action = QtGui.QAction("Show &Symbols", self)
+
+        self.help_action = QtGui.QAction("QtDSExporter Help", self)
+        self.about_action = QtGui.QAction("&About", self)
+
     def create_symbol_dock(self):
+        if getattr(self, "dock", None):
+            self.dock.show()
+            return
+
         self.dock = QtGui.QDockWidget("Symbols", self)
         self.symbol_window = QtGui.QListWidget(self.dock)
         self.symbol_window.window().setWindowTitle("Symbols")
         self.dock.setWidget(self.symbol_window)
         self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.dock)
+
+        self.load_symbols()
 
     def create_status_bar(self):
         self.status = QtGui.QLabel("Ready")
@@ -72,11 +102,19 @@ class MainWindow(QtGui.QMainWindow):
 
 
     def create_connections(self):
+        self.connect(self.symbol_action, QtCore.SIGNAL("triggered()"),
+                     self.create_symbol_dock)
+        self.connect(self.about_action, QtCore.SIGNAL("triggered()"),
+                     self.about)
+
         self.connect(self.fetch_check, QtCore.SIGNAL("stateChanged(int)"),
                      self.fetch)
         self.connect(self.timer, QtCore.SIGNAL("timeout()"), self.make_request)
         self.connect(self.symbol_window, QtCore.SIGNAL("doubleClicked("
             "const QModelIndex&)"), self.plot_graph)
+
+    def about(self):
+        QtGui.QMessageBox.about(self, "QtDSExporter", "A DSE data exporter")
 
     def load_symbols(self):
         self.symbol_window.clear()
