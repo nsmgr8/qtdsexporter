@@ -290,8 +290,12 @@ class MainWindow(QtGui.QMainWindow):
 
         for i, ff in enumerate(files):
             progress.setValue(i)
+
             with open(ff, 'r') as f:
                 self.save_data(f.read())
+
+            if progress.wasCanceled():
+                break
 
         progress.setValue(len(files))
         progress.close()
