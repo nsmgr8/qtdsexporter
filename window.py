@@ -49,8 +49,9 @@ class MainWindow(QtGui.QMainWindow):
         self.create_menus()
 
         self.create_symbol_dock()
-        self.create_status_bar()
         self.create_connections()
+
+        self.statusBar().showMessage("Ready")
 
     def create_menus(self):
         file_menu = self.menuBar().addMenu("&File")
@@ -80,26 +81,22 @@ class MainWindow(QtGui.QMainWindow):
             return
 
         self.dock = QtGui.QDockWidget("Symbols", self)
-        self.symbol_window = QtGui.QListWidget(self.dock)
+        self.dock.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea |
+                                  QtCore.Qt.RightDockWidgetArea)
+        self.symbol_window = QtGui.QListWidget()
         self.symbol_window.window().setWindowTitle("Symbols")
-        self.dock.setWidget(self.symbol_window)
-        self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.dock)
-
         self.load_symbols()
 
-    def create_status_bar(self):
-        self.status = QtGui.QLabel("Ready")
         self.fetch_check = QtGui.QCheckBox("Fetch new data")
 
-        hbox1 = QtGui.QHBoxLayout()
-        hbox1.addWidget(self.status)
-        hbox1.addStretch()
-        hbox1.addWidget(self.fetch_check)
-
         widget = QtGui.QWidget()
-        widget.setLayout(hbox1)
-        self.statusBar().addWidget(widget)
+        vbox = QtGui.QVBoxLayout()
+        vbox.addWidget(self.symbol_window)
+        vbox.addWidget(self.fetch_check)
+        widget.setLayout(vbox)
 
+        self.dock.setWidget(widget)
+        self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.dock)
 
     def create_connections(self):
         self.connect(self.symbol_action, QtCore.SIGNAL("triggered()"),
@@ -135,10 +132,10 @@ class MainWindow(QtGui.QMainWindow):
 
     def stop_fetching(self):
         self.timer.stop()
-        self.status.setText("Ready")
+        self.statusBar().showMessage("Ready")
 
     def make_request(self):
-        self.status.setText("Requesting new data...")
+        self.statusBar().showMessage("Requesting new data...")
 
         url = QtCore.QUrl("http://dsecse.latest.nsmgr8.appspot.com/dse")
         self.reply = self.nam.get(QtNetwork.QNetworkRequest(url))
@@ -169,7 +166,7 @@ class MainWindow(QtGui.QMainWindow):
         else:
             msg = "Error downloading data: %s" % str(status.toInt())
 
-        self.status.setText(msg)
+        self.statusBar().showMessage(msg)
 
     def save_data(self, data):
         day_start = '11:00:00'
