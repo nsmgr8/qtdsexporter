@@ -29,7 +29,12 @@ from window import MainWindow
 if __name__ == '__main__':
     app = QtGui.QApplication(sys.argv)
 
-    window = MainWindow()
-    window.show()
+    try:
+        window = MainWindow()
+        window.show()
+    except Exception, e:
+        print(e)
+        sys.exit(QtGui.QMessageBox.critical(None, "Error: starting app",
+            "Please check that mongodb server is running"))
 
     sys.exit(app.exec_())

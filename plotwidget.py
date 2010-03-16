@@ -109,7 +109,7 @@ class PlotWidget(QtGui.QWidget):
         trades = [(datetime.datetime.strptime(trade['datetime'], "%Y%m%d%H%M%S"),
                   float(trade['open'])) for trade in query]
 
-        if len(trades) < 1:
+        if len(trades) < 2:
             return
 
         heads = ['DateTime', 'Open',]
@@ -140,7 +140,7 @@ class PlotWidget(QtGui.QWidget):
             self.axes1.fill_between(r.datetime, rsi, 70, where=(rsi>=70), facecolor=fillcolor, edgecolor=fillcolor)
             self.axes1.fill_between(r.datetime, rsi, 30, where=(rsi<=30), facecolor=fillcolor, edgecolor=fillcolor)
         except:
-            pass
+            self.axes1.plot(r.datetime, r.open, color='black', label='Open')
 
         self.axes1.axhline(70, color=fillcolor)
         self.axes1.axhline(30, color=fillcolor)
@@ -180,7 +180,7 @@ class PlotWidget(QtGui.QWidget):
             self.axes3.plot(r.datetime, ema9, color='blue', lw=1)
             self.axes3.fill_between(r.datetime, macd-ema9, 0, alpha=0.5, facecolor=fillcolor, edgecolor=fillcolor)
         except:
-            pass
+            self.axes3.plot(r.datetime, r.open, color='black', label='Open')
 
         self.axes3.text(0.025, 0.95, 'MACD (%d, %d, %d)'%(nfast, nslow, nema), va='top',
                  transform=self.axes3.transAxes, fontsize=textsize)
