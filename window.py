@@ -58,22 +58,59 @@ class MainWindow(QtGui.QMainWindow):
         window_menu = self.menuBar().addMenu("&Window")
         help_menu = self.menuBar().addMenu("&Help")
 
+        file_menu.addAction(self.import_action)
+        file_menu.addAction(self.export_action)
         file_menu.addAction(self.close_action)
         file_menu.addAction(self.quit_action)
 
         window_menu.addAction(self.symbol_action)
+        window_menu.addSeparator()
+        window_menu.addAction(self.tile_action)
+        window_menu.addAction(self.cascade_action)
 
         help_menu.addAction(self.help_action)
         help_menu.addAction(self.about_action)
 
     def create_actions(self):
+        self.import_action = QtGui.QAction("&Impot CSV", self)
+        self.export_action = QtGui.QAction("E&xport CSV", self)
+
         self.close_action = QtGui.QAction("&Close", self)
         self.quit_action = QtGui.QAction("&Quit", self)
 
         self.symbol_action = QtGui.QAction("Show &Symbols", self)
+        self.tile_action = QtGui.QAction("Tile windows", self)
+        self.cascade_action = QtGui.QAction("Cascade windows", self)
 
         self.help_action = QtGui.QAction("QtDSExporter Help", self)
         self.about_action = QtGui.QAction("&About", self)
+
+    def create_connections(self):
+        self.connect(self.import_action, QtCore.SIGNAL("triggered()"),
+                     self.import_csv)
+        self.connect(self.export_action, QtCore.SIGNAL("triggered()"),
+                     self.export_csv)
+
+        self.connect(self.close_action, QtCore.SIGNAL("triggered()"), self.mdi,
+                     QtCore.SLOT("closeActiveSubWindow()"))
+        self.connect(self.quit_action, QtCore.SIGNAL("triggered()"),
+                     QtGui.QApplication.instance(), QtCore.SLOT("closeAllWindows()"))
+
+        self.connect(self.symbol_action, QtCore.SIGNAL("triggered()"),
+                     self.create_symbol_dock)
+        self.connect(self.tile_action, QtCore.SIGNAL("triggered()"), self.mdi,
+                     QtCore.SLOT("tileSubWindows()"))
+        self.connect(self.cascade_action, QtCore.SIGNAL("triggered()"), self.mdi,
+                     QtCore.SLOT("cascadeSubWindows()"))
+
+        self.connect(self.about_action, QtCore.SIGNAL("triggered()"),
+                     self.about)
+
+        self.connect(self.fetch_check, QtCore.SIGNAL("stateChanged(int)"),
+                     self.fetch)
+        self.connect(self.timer, QtCore.SIGNAL("timeout()"), self.make_request)
+        self.connect(self.symbol_window, QtCore.SIGNAL("doubleClicked("
+            "const QModelIndex&)"), self.plot_graph)
 
     def create_symbol_dock(self):
         if getattr(self, "dock", None):
@@ -97,18 +134,6 @@ class MainWindow(QtGui.QMainWindow):
 
         self.dock.setWidget(widget)
         self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.dock)
-
-    def create_connections(self):
-        self.connect(self.symbol_action, QtCore.SIGNAL("triggered()"),
-                     self.create_symbol_dock)
-        self.connect(self.about_action, QtCore.SIGNAL("triggered()"),
-                     self.about)
-
-        self.connect(self.fetch_check, QtCore.SIGNAL("stateChanged(int)"),
-                     self.fetch)
-        self.connect(self.timer, QtCore.SIGNAL("timeout()"), self.make_request)
-        self.connect(self.symbol_window, QtCore.SIGNAL("doubleClicked("
-            "const QModelIndex&)"), self.plot_graph)
 
     def about(self):
         QtGui.QMessageBox.about(self, "QtDSExporter", "A DSE data exporter")
@@ -158,7 +183,7 @@ class MainWindow(QtGui.QMainWindow):
                 f.write(data)
 
             self.save_data(data)
-            self.plot_graph()
+            self.refresh_graphs()
 
             trade_at = datetime.datetime.strptime(fname[-23:-4],
                                                   "%Y-%m-%dT%H-%M-%S")
@@ -249,3 +274,27 @@ class MainWindow(QtGui.QMainWindow):
             if w.widget() == plot:
                 self.mdi.setActiveSubWindow(w)
 
+    def refresh_graphs(self):
+        for code, _ in self.plots.items():
+            self.plots[code].plot_graph()
+
+    def import_csv(self):
+        files = QtGui.QFileDialog.getOpenFileNames(self, "Import CSV",
+                                                   filter="CSV Files (*.csv)")
+
+        progress = QtGui.QProgressDialog("Importing csv...", "Abort import", 0,
+                                         len(files), self)
+        progress.setWindowModality(QtCore.Qt.WindowModal)
+
+        for i, ff in enumerate(files):
+            progress.setValue(i)
+            with open(ff, 'r') as f:
+                self.save_data(f.read())
+
+        progress.setValue(len(files))
+
+        self.load_symbols()
+
+    def export_csv(self):
+        QtGui.QMessageBox.information(self, "Not implemented",
+            "Exporting has not been implemented yet")
