@@ -98,6 +98,23 @@ class PlotWidget(QtGui.QWidget):
         del self.plots[self.code]
 
     def plot_graph(self):
+        from_ = self.date_picker.date()
+        from_ = datetime.date(day=from_.day(), month=from_.month(),
+                              year=from_.year())
+        to = from_ + datetime.timedelta(days=1)
+        from_ = from_.strftime("%Y%m%d")
+        to = to.strftime("%Y%m%d")
+        query = self.db.trades.find({'code': self.code, 'datetime': {'$gte':
+                                     from_, '$lt': to}}).sort('datetime')
+        trades = [(datetime.datetime.strptime(trade['datetime'], "%Y%m%d%H%M%S"),
+                  float(trade['open'])) for trade in query]
+
+        if len(trades) < 1:
+            return
+
+        heads = ['DateTime', 'Open',]
+        r = indicators.get_records(heads, trades)
+
         self.axes1.cla()
         self.axes2.cla()
         self.axes3.cla()
@@ -113,75 +130,60 @@ class PlotWidget(QtGui.QWidget):
 
             ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
 
-        from_ = self.date_picker.date()
-        from_ = datetime.date(day=from_.day(), month=from_.month(),
-                              year=from_.year())
-        to = from_ + datetime.timedelta(days=1)
-        from_ = from_.strftime("%Y%m%d")
-        to = to.strftime("%Y%m%d")
-        query = self.db.trades.find({'code': self.code, 'datetime': {'$gte':
-                                     from_, '$lt': to}}).sort('datetime')
-        trades = [(datetime.datetime.strptime(trade['datetime'], "%Y%m%d%H%M%S"),
-                  float(trade['open'])) for trade in query]
+        try:
+            rsi = indicators.relative_strength(r.open)
 
-        if len(trades) > 0:
-            heads = ['DateTime', 'Open',]
-            r = indicators.get_records(heads, trades)
+            fillcolor = 'darkgoldenrod'
+            textsize = 9
 
-            try:
-                rsi = indicators.relative_strength(r.open)
+            self.axes1.plot(r.datetime, rsi, fillcolor)
+            self.axes1.fill_between(r.datetime, rsi, 70, where=(rsi>=70), facecolor=fillcolor, edgecolor=fillcolor)
+            self.axes1.fill_between(r.datetime, rsi, 30, where=(rsi<=30), facecolor=fillcolor, edgecolor=fillcolor)
+        except:
+            pass
 
-                fillcolor = 'darkgoldenrod'
-                textsize = 9
+        self.axes1.axhline(70, color=fillcolor)
+        self.axes1.axhline(30, color=fillcolor)
+        self.axes1.text(0.6, 0.9, '>70 = overbought', va='top',
+                        transform=self.axes1.transAxes, fontsize=textsize)
+        self.axes1.text(0.6, 0.1, '<30 = oversold', transform=self.axes1.transAxes, fontsize=textsize)
+        self.axes1.set_ylim(0, 100)
+        self.axes1.set_yticks([30,70])
+        self.axes1.text(0.025, 0.95, 'RSI (14)', va='top',
+                        transform=self.axes1.transAxes, fontsize=textsize)
 
-                self.axes1.plot(r.datetime, rsi, fillcolor)
-                self.axes1.fill_between(r.datetime, rsi, 70, where=(rsi>=70), facecolor=fillcolor, edgecolor=fillcolor)
-                self.axes1.fill_between(r.datetime, rsi, 30, where=(rsi<=30), facecolor=fillcolor, edgecolor=fillcolor)
-            except:
-                pass
+        try:
+            ma = indicators.moving_average(r.open, 10, type_='simple')
+            self.axes2.plot(r.datetime, ma, color='blue', lw=2, label='MA (10)')
+        except:
+            pass
 
-            self.axes1.axhline(70, color=fillcolor)
-            self.axes1.axhline(30, color=fillcolor)
-            self.axes1.text(0.6, 0.9, '>70 = overbought', va='top',
-                            transform=self.axes1.transAxes, fontsize=textsize)
-            self.axes1.text(0.6, 0.1, '<30 = oversold', transform=self.axes1.transAxes, fontsize=textsize)
-            self.axes1.set_ylim(0, 100)
-            self.axes1.set_yticks([30,70])
-            self.axes1.text(0.025, 0.95, 'RSI (14)', va='top',
-                            transform=self.axes1.transAxes, fontsize=textsize)
+        try:
+            ma = indicators.moving_average(r.open, 20, type_='simple')
+            self.axes2.plot(r.datetime, ma, color='red', lw=2, label='MA (20)')
+        except:
+            pass
 
-            try:
-                ma = indicators.moving_average(r.open, 10, type_='simple')
-                self.axes2.plot(r.datetime, ma, color='blue', lw=2, label='MA (10)')
-            except:
-                pass
+        self.axes2.plot(r.datetime, r.open, color='black', label='Open')
 
-            try:
-                ma = indicators.moving_average(r.open, 20, type_='simple')
-                self.axes2.plot(r.datetime, ma, color='red', lw=2, label='MA (20)')
-            except:
-                pass
+        props = font_manager.FontProperties(size=8)
+        self.axes2.legend(loc='lower left', shadow=True, fancybox=True, prop=props)
 
-            self.axes2.plot(r.datetime, r.open, color='black', label='Open')
+        fillcolor = 'darkslategrey'
+        nslow, nfast, nema = 26, 12, 9
 
-            props = font_manager.FontProperties(size=8)
-            self.axes2.legend(loc='lower left', shadow=True, fancybox=True, prop=props)
+        try:
+            emaslow, emafast, macd = indicators.moving_average_convergence(r.open, nslow=nslow, nfast=nfast)
+            ema9 = indicators.moving_average(macd, nema, type_='exponential')
 
-            fillcolor = 'darkslategrey'
-            nslow, nfast, nema = 26, 12, 9
+            self.axes3.plot(r.datetime, macd, color='black', lw=2)
+            self.axes3.plot(r.datetime, ema9, color='blue', lw=1)
+            self.axes3.fill_between(r.datetime, macd-ema9, 0, alpha=0.5, facecolor=fillcolor, edgecolor=fillcolor)
+        except:
+            pass
 
-            try:
-                emaslow, emafast, macd = indicators.moving_average_convergence(r.open, nslow=nslow, nfast=nfast)
-                ema9 = indicators.moving_average(macd, nema, type_='exponential')
-
-                self.axes3.plot(r.datetime, macd, color='black', lw=2)
-                self.axes3.plot(r.datetime, ema9, color='blue', lw=1)
-                self.axes3.fill_between(r.datetime, macd-ema9, 0, alpha=0.5, facecolor=fillcolor, edgecolor=fillcolor)
-            except:
-                pass
-
-            self.axes3.text(0.025, 0.95, 'MACD (%d, %d, %d)'%(nfast, nslow, nema), va='top',
-                     transform=self.axes3.transAxes, fontsize=textsize)
+        self.axes3.text(0.025, 0.95, 'MACD (%d, %d, %d)'%(nfast, nslow, nema), va='top',
+                 transform=self.axes3.transAxes, fontsize=textsize)
 
         self.axes1.grid(True)
         self.axes2.grid(True)

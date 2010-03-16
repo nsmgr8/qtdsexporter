@@ -45,15 +45,17 @@ class MainWindow(QtGui.QMainWindow):
         self.timer = QtCore.QTimer()
         self.timer.setInterval(50000)
 
+        self.create_symbol_dock()
+        self.load_symbols()
+        self.create_status_bar()
+        self.create_connections()
+
+    def create_symbol_dock(self):
         self.dock = QtGui.QDockWidget("Symbols", self)
         self.symbol_window = QtGui.QListWidget(self.dock)
         self.symbol_window.window().setWindowTitle("Symbols")
         self.dock.setWidget(self.symbol_window)
         self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.dock)
-
-        self.populate_widgets()
-        self.create_status_bar()
-        self.create_connections()
 
     def create_status_bar(self):
         self.status = QtGui.QLabel("Ready")
@@ -76,7 +78,7 @@ class MainWindow(QtGui.QMainWindow):
         self.connect(self.symbol_window, QtCore.SIGNAL("doubleClicked("
             "const QModelIndex&)"), self.plot_graph)
 
-    def populate_widgets(self):
+    def load_symbols(self):
         self.symbol_window.clear()
         self.symbol_window.addItems(sorted([code['symbol'] for code in
                                             self.db.codes.find()]))
@@ -191,7 +193,7 @@ class MainWindow(QtGui.QMainWindow):
                     print("%s: [%d, %d, %d]" % (fname, self.db.trades.count(),
                                                 self.db.close.count(),
                                                 self.db.codes.count()))
-            self.populate_widgets()
+            self.load_symbols()
 
     def plot_graph(self):
         try:
@@ -205,8 +207,10 @@ class MainWindow(QtGui.QMainWindow):
             plot = PlotWidget(code=code, plots=self.plots)
             self.mdi.addSubWindow(plot)
             self.plots[code] = plot
+            plot.plot_graph()
+            plot.show()
 
-        plot.plot_graph()
-        plot.show()
-        plot.activateWindow()
+        for w in self.mdi.subWindowList():
+            if w.widget() == plot:
+                self.mdi.setActiveSubWindow(w)
 
