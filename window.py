@@ -286,6 +286,7 @@ class MainWindow(QtGui.QMainWindow):
         progress = QtGui.QProgressDialog("Importing csv...", "Abort import", 0,
                                          len(files), self)
         progress.setWindowModality(QtCore.Qt.WindowModal)
+        progress.show()
 
         for i, ff in enumerate(files):
             progress.setValue(i)
