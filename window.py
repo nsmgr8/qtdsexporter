@@ -280,8 +280,8 @@ class MainWindow(QtGui.QMainWindow):
             self.plots[code].plot_graph()
 
     def import_csv(self):
-        files = QtGui.QFileDialog.getOpenFileNames(self, "Import CSV",
-                                                   filter="CSV Files (*.csv)")
+        files = QtGui.QFileDialog.getOpenFileNames(self, "Import CSV", ".",
+                                                   "CSV Files (*.csv)")
 
         progress = QtGui.QProgressDialog("Importing csv...", "Abort import", 0,
                                          len(files), self)
@@ -294,6 +294,7 @@ class MainWindow(QtGui.QMainWindow):
                 self.save_data(f.read())
 
         progress.setValue(len(files))
+        progress.close()
 
         self.load_symbols()
 
