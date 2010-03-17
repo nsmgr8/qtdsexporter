@@ -188,7 +188,7 @@ class MainWindow(QtGui.QMainWindow):
 
             trade_at = datetime.datetime.strptime(fname[-23:-4],
                                                   "%Y-%m-%dT%H-%M-%S")
-            msg = "Saved data at %s" % trade_at.isoformat()
+            msg = "Last update at %s" % trade_at.isoformat()
         else:
             msg = "Error downloading data: %s" % str(status.toInt())
 
@@ -236,6 +236,11 @@ class MainWindow(QtGui.QMainWindow):
                     'trade': d[9],
                     'volume': d[10],
                 })
+
+                check = self.fetch_check.checkState()
+                if check == QtCore.Qt.Checked:
+                    self.fetch_check.setCheckState(QtCore.Qt.Unchecked)
+
 
     def load_data(self):
         dirname = os.path.join(os.path.dirname(os.path.realpath(__file__)),

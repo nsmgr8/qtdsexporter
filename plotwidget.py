@@ -110,14 +110,17 @@ class PlotWidget(QtGui.QWidget):
                   float(trade['open'])) for trade in query]
 
         if len(trades) < 2:
+            self.clear()
+            self.axes1.plot()
+            self.axes2.plot()
+            self.axes3.plot()
+            self.redraw()
             return
 
         heads = ['DateTime', 'Open',]
         r = indicators.get_records(heads, trades)
 
-        self.axes1.cla()
-        self.axes2.cla()
-        self.axes3.cla()
+        self.clear()
 
         for ax in self.axes1, self.axes2, self.axes3:
             if ax != self.axes3:
@@ -167,7 +170,7 @@ class PlotWidget(QtGui.QWidget):
         self.axes2.plot(r.datetime, r.open, color='black', label='Open')
 
         props = font_manager.FontProperties(size=8)
-        self.axes2.legend(loc='lower left', shadow=True, fancybox=True, prop=props)
+        self.axes2.legend(loc='best', shadow=True, fancybox=True, prop=props)
 
         fillcolor = 'darkslategrey'
         nslow, nfast, nema = 26, 12, 9
@@ -185,8 +188,17 @@ class PlotWidget(QtGui.QWidget):
         self.axes3.text(0.025, 0.95, 'MACD (%d, %d, %d)'%(nfast, nslow, nema), va='top',
                  transform=self.axes3.transAxes, fontsize=textsize)
 
+
+        self.redraw()
+
+    def redraw(self):
         self.axes1.grid(True)
         self.axes2.grid(True)
         self.axes3.grid(True)
         self.canvas.draw()
+
+    def clear(self):
+        self.axes1.cla()
+        self.axes2.cla()
+        self.axes3.cla()
 
