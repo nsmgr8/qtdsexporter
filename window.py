@@ -19,6 +19,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 
 import os
+import csv
 import datetime
 import string
 
@@ -183,7 +184,8 @@ class MainWindow(QtGui.QMainWindow):
             with open(fname, 'wb') as f:
                 f.write(data)
 
-            self.save_data(data)
+            self.save_data(fname)
+
             self.refresh_graphs()
 
             trade_at = datetime.datetime.strptime(fname[-23:-4],
@@ -194,16 +196,15 @@ class MainWindow(QtGui.QMainWindow):
 
         self.statusBar().showMessage(msg)
 
-    def save_data(self, data):
+    def save_data(self, fname):
         day_start = '11:00:00'
-        day_end = '15:06:00'
-        data = str(data).split('\r\n')[1:]
-        for d in data:
-            d = map(string.strip, d.split(','))
-            if len(d) < 11:
-                print "malformed data:", d
-                continue
+        day_end = '15:16:00'
+        data = csv.reader(open(fname))
+        d = data.next()
+        if len(d) < 11:
+            return
 
+        for d in data:
             if d[2] < day_start or d[2] > day_end:
                 print "out of trading time:", d[2]
                 continue
@@ -293,12 +294,9 @@ class MainWindow(QtGui.QMainWindow):
         progress.setWindowModality(QtCore.Qt.WindowModal)
         progress.show()
 
-        for i, ff in enumerate(files):
+        for i, f in enumerate(files):
             progress.setValue(i)
-
-            with open(ff, 'r') as f:
-                self.save_data(f.read())
-
+            self.save_data(f)
             if progress.wasCanceled():
                 break
 
